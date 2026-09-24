@@ -39,10 +39,12 @@ export type Game = Database['public']['Tables']['games']['Row']
 
 export type GameResult = Database['public']['Views']['game_results']['Row']
 
+export type QuestionType = Database['public']['Tables']['questions']['Row']['question_type']
+
 /**
  * Bentuk soal yang dibaca pemain lewat RPC `get_game_questions`
- * (lihat `supabase/hardening.sql`). `is_correct` bernilai null selama
- * jawaban belum di-reveal.
+ * (lihat `supabase/hardening.sql`). Kunci jawaban (`text_answer` dan
+ * `is_correct`) bernilai null selama jawaban belum di-reveal.
  */
 export type GameQuestion = {
   id: string
@@ -51,6 +53,9 @@ export type GameQuestion = {
   order: number
   time_limit: number
   points: number
+  question_type: QuestionType
+  text_exact: boolean
+  text_answer: string | null
   choices: {
     id: string
     body: string

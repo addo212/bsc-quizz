@@ -10,6 +10,7 @@ import {
   Game,
   GameResult,
   Participant,
+  Question,
   QuizSet,
   supabase,
 } from '@/types/types'
@@ -28,7 +29,7 @@ import {
 } from '@/lib/game'
 import { getQuizSet } from '@/lib/quiz'
 import { useSession } from '@/lib/use-session'
-import { scoreForAnswer } from '@/lib/utils'
+import { isTextAnswerCorrect, scoreForAnswer } from '@/lib/utils'
 import { Alert, ButtonLink, Logo, Spinner } from '@/components/ui'
 
 export default function HostGamePage({ params }: { params: { pin: string } }) {
@@ -264,9 +265,7 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
           rows.map((row) => ({
             answerId: row.id,
             score: scoreForAnswer({
-              isCorrect:
-                question.choices.find((choice) => choice.id === row.choice_id)
-                  ?.is_correct ?? false,
+              isCorrect: isAnswerCorrect(question, row),
               elapsedMs: row.time_taken_ms ?? 0,
               timeLimitSec: question.time_limit,
               points: question.points,
@@ -493,5 +492,29 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       onNext={handleNext}
       onFinish={handleFinish}
     />
+  )
+}
+
+/**
+ * Menentukan sebuah jawaban benar atau salah.
+ *
+ * - Soal pilihan ganda: cek `is_correct` pada pilihan yang dipilih pemain.
+ * - Soal "jawaban diketik": bandingkan teks yang diketik dengan kunci jawaban.
+ *
+ * Perbandingan teks mengabaikan spasi berlebih dan (kecuali `text_exact`
+ * diaktifkan) mengabaikan huruf besar/kecil.
+ */
+function isAnswerCorrect(question: Question, answer: Answer) {
+  if (question.question_type === 'text') {
+    return isTextAnswerCorrect({
+      given: answer.free_text,
+      key: question.text_answer,
+      exact: question.text_exact,
+    })
+  }
+
+  return (
+    question.choices.find((choice) => choice.id === answer.choice_id)
+      ?.is_correct ?? false
   )
 }

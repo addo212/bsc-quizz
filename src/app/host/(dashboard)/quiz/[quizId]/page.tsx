@@ -12,8 +12,10 @@ import {
   DEFAULT_POINTS,
   DEFAULT_TIME_LIMIT,
   MAX_NAME_LENGTH,
+  MAX_TEXT_ANSWER_LENGTH,
   MAX_TIME_LIMIT,
   MIN_TIME_LIMIT,
+  QUESTION_TYPES,
 } from '@/constants'
 import { cn, downloadJson, slugify } from '@/lib/utils'
 import { AnswerShape } from '@/components/game-ui'
@@ -58,6 +60,9 @@ function emptyQuestion(order: number): Question {
     quiz_set_id: '',
     time_limit: DEFAULT_TIME_LIMIT,
     points: DEFAULT_POINTS,
+    question_type: 'choice',
+    text_answer: null,
+    text_exact: false,
     choices: [emptyChoice(), emptyChoice()],
   }
 }
@@ -129,6 +134,14 @@ export default function QuizEditorPage({
     if (!draft.name.trim()) list.push('Judul kuis masih kosong.')
     draft.questions.forEach((question, index) => {
       if (!question.body.trim()) list.push(`Soal ${index + 1} belum diisi.`)
+
+      // Soal jawaban diketik: cukup butuh kunci jawaban.
+      if (question.question_type === 'text') {
+        if (!question.text_answer?.trim())
+          list.push(`Soal ${index + 1} belum punya kunci jawaban.`)
+        return
+      }
+
       const filled = question.choices.filter((choice) => choice.body.trim())
       if (filled.length < 2)
         list.push(`Soal ${index + 1} butuh minimal 2 pilihan jawaban.`)
@@ -318,6 +331,9 @@ export default function QuizEditorPage({
         image_url: question.image_url,
         time_limit: question.time_limit,
         points: question.points,
+        type: question.question_type,
+        text_answer: question.text_answer,
+        text_exact: question.text_exact,
         choices: question.choices.map((choice) => ({
           body: choice.body,
           is_correct: choice.is_correct,
@@ -335,25 +351,43 @@ export default function QuizEditorPage({
         throw new Error('File tidak berisi daftar soal.')
       }
 
-      const questions: Question[] = incoming.map((raw, index) => ({
-        id: crypto.randomUUID(),
-        created_at: new Date().toISOString(),
-        body: String(raw.body ?? raw.question ?? `Soal ${index + 1}`),
-        image_url: raw.image_url ?? null,
-        order: index,
-        quiz_set_id: '',
-        time_limit: Number(raw.time_limit) || DEFAULT_TIME_LIMIT,
-        points: Number(raw.points) || DEFAULT_POINTS,
-        choices: (Array.isArray(raw.choices) ? raw.choices : []).map(
-          (choice: any): Choice => ({
-            id: crypto.randomUUID(),
-            created_at: new Date().toISOString(),
-            question_id: '',
-            body: String(choice.body ?? choice.text ?? ''),
-            is_correct: Boolean(choice.is_correct),
-          })
-        ),
-      }))
+      const questions: Question[] = incoming.map((raw, index) => {
+        const textAnswer =
+          typeof raw.text_answer === 'string' && raw.text_answer.trim()
+            ? raw.text_answer.trim()
+            : null
+        // Soal dianggap "jawaban diketik" kalau tipenya disebut, atau kalau
+        // file hanya menyediakan `text_answer` tanpa daftar pilihan.
+        const isText =
+          raw.type === 'text' ||
+          raw.question_type === 'text' ||
+          (Boolean(textAnswer) && !Array.isArray(raw.choices))
+
+        return {
+          id: crypto.randomUUID(),
+          created_at: new Date().toISOString(),
+          body: String(raw.body ?? raw.question ?? `Soal ${index + 1}`),
+          image_url: raw.image_url ?? null,
+          order: index,
+          quiz_set_id: '',
+          time_limit: Number(raw.time_limit) || DEFAULT_TIME_LIMIT,
+          points: Number(raw.points) || DEFAULT_POINTS,
+          question_type: isText ? ('text' as const) : ('choice' as const),
+          text_answer: isText ? textAnswer : null,
+          text_exact: Boolean(raw.text_exact),
+          choices: isText
+            ? []
+            : (Array.isArray(raw.choices) ? raw.choices : []).map(
+                (choice: any): Choice => ({
+                  id: crypto.randomUUID(),
+                  created_at: new Date().toISOString(),
+                  question_id: '',
+                  body: String(choice.body ?? choice.text ?? ''),
+                  is_correct: Boolean(choice.is_correct),
+                })
+              ),
+        }
+      })
 
       mutate((current) => ({
         ...current,
@@ -721,6 +755,31 @@ function QuestionEditor({
           />
         </Field>
 
+        <Field label="Tipe soal">
+          <div className="grid gap-2 sm:grid-cols-2">
+            {QUESTION_TYPES.map((type) => (
+              <button
+                key={type.id}
+                type="button"
+                onClick={() => onUpdate({ question_type: type.id })}
+                className={cn(
+                  'rounded-xl border p-3 text-left transition',
+                  question.question_type === type.id
+                    ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-500/20'
+                    : 'border-slate-200 bg-white hover:border-slate-300'
+                )}
+              >
+                <span className="block text-sm font-bold text-slate-800">
+                  {type.label}
+                </span>
+                <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                  {type.hint}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Field>
+
         <Field
           label="URL gambar (opsional)"
           hint="Tempel tautan gambar publik (https://…) untuk ditampilkan di atas soal."
@@ -798,7 +857,10 @@ function QuestionEditor({
           </Field>
         </div>
 
-        {/* Pilihan jawaban */}
+        {/* Pilihan jawaban / kunci jawaban teks */}
+        {question.question_type === 'text' ? (
+          <TextAnswerFields question={question} onUpdate={onUpdate} />
+        ) : (
         <div>
           <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
             Pilihan jawaban{' '}
@@ -873,7 +935,53 @@ function QuestionEditor({
             </button>
           )}
         </div>
+        )}
       </div>
+    </div>
+  )
+}
+
+/** Kunci jawaban untuk soal bertipe "jawaban diketik". */
+function TextAnswerFields({
+  question,
+  onUpdate,
+}: {
+  question: Question
+  onUpdate: (patch: Partial<Question>) => void
+}) {
+  return (
+    <div className="rounded-2xl border border-emerald-200 bg-emerald-50/60 p-4">
+      <Field
+        label="Kunci jawaban"
+        hint="Pemain harus mengetik jawaban ini supaya dianggap benar. Hanya huruf/angka dan tanda baca biasa yang disarankan."
+      >
+        <Input
+          value={question.text_answer ?? ''}
+          maxLength={MAX_TEXT_ANSWER_LENGTH}
+          onChange={(event) => onUpdate({ text_answer: event.target.value })}
+          placeholder="mis. Zainul Arifin"
+          className="border-emerald-200 bg-white font-semibold"
+        />
+      </Field>
+
+      <label className="mt-3 flex cursor-pointer items-start gap-3">
+        <input
+          type="checkbox"
+          checked={question.text_exact}
+          onChange={(event) => onUpdate({ text_exact: event.target.checked })}
+          className="mt-0.5 h-4 w-4 accent-violet-600"
+        />
+        <span>
+          <span className="block text-sm font-semibold text-slate-800">
+            Wajib sama persis (peka huruf besar/kecil)
+          </span>
+          <span className="block text-xs leading-relaxed text-slate-500">
+            Kalau tidak dicentang, &ldquo;zainul arifin&rdquo; dan &ldquo;Zainul
+            Arifin&rdquo; sama-sama dianggap benar. Spasi berlebih di awal/akhir
+            dan spasi ganda selalu diabaikan.
+          </span>
+        </span>
+      </label>
     </div>
   )
 }

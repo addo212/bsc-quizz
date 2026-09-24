@@ -17,6 +17,8 @@ export type Json =
 
 export type GamePhase = 'lobby' | 'quiz' | 'result'
 
+export type QuestionType = 'choice' | 'text'
+
 export interface Database {
   public: {
     Tables: {
@@ -60,6 +62,9 @@ export interface Database {
           quiz_set_id: string
           time_limit: number
           points: number
+          question_type: QuestionType
+          text_answer: string | null
+          text_exact: boolean
         }
         Insert: {
           id?: string
@@ -70,6 +75,9 @@ export interface Database {
           quiz_set_id: string
           time_limit?: number
           points?: number
+          question_type?: QuestionType
+          text_answer?: string | null
+          text_exact?: boolean
         }
         Update: {
           id?: string
@@ -80,6 +88,9 @@ export interface Database {
           quiz_set_id?: string
           time_limit?: number
           points?: number
+          question_type?: QuestionType
+          text_answer?: string | null
+          text_exact?: boolean
         }
         Relationships: []
       }
@@ -173,6 +184,7 @@ export interface Database {
           score: number
           choice_id: string | null
           time_taken_ms: number
+          free_text: string | null
         }
         Insert: {
           id?: string
@@ -182,6 +194,7 @@ export interface Database {
           score: number
           choice_id?: string | null
           time_taken_ms?: number
+          free_text?: string | null
         }
         Update: {
           id?: string
@@ -191,6 +204,7 @@ export interface Database {
           score?: number
           choice_id?: string | null
           time_taken_ms?: number
+          free_text?: string | null
         }
         Relationships: []
       }

@@ -107,23 +107,33 @@ export async function saveQuiz({
   quizId: string
   questions: Question[]
 }) {
-  const payloadQuestions = questions.map((question, index) => ({
-    id: question.id || crypto.randomUUID(),
-    quiz_set_id: quizId,
-    body: question.body?.trim() || `Soal ${index + 1}`,
-    image_url: question.image_url?.trim() ? question.image_url.trim() : null,
-    order: index,
-    time_limit: question.time_limit ?? DEFAULT_TIME_LIMIT,
-    points: question.points ?? DEFAULT_POINTS,
-  }))
+  const payloadQuestions = questions.map((question, index) => {
+    const isText = question.question_type === 'text'
+    return {
+      id: question.id || crypto.randomUUID(),
+      quiz_set_id: quizId,
+      body: question.body?.trim() || `Soal ${index + 1}`,
+      image_url: question.image_url?.trim() ? question.image_url.trim() : null,
+      order: index,
+      time_limit: question.time_limit ?? DEFAULT_TIME_LIMIT,
+      points: question.points ?? DEFAULT_POINTS,
+      question_type: isText ? ('text' as const) : ('choice' as const),
+      // Kunci jawaban hanya relevan untuk soal bertipe teks.
+      text_answer: isText ? question.text_answer?.trim() || null : null,
+      text_exact: isText ? Boolean(question.text_exact) : false,
+    }
+  })
 
+  // Soal bertipe teks tidak punya pilihan jawaban.
   const payloadChoices = questions.flatMap((question, qIndex) =>
-    (question.choices ?? []).map((choice) => ({
-      id: choice.id || crypto.randomUUID(),
-      question_id: payloadQuestions[qIndex].id,
-      body: choice.body?.trim() ? choice.body.trim() : 'Pilihan',
-      is_correct: Boolean(choice.is_correct),
-    }))
+    question.question_type === 'text'
+      ? []
+      : (question.choices ?? []).map((choice) => ({
+          id: choice.id || crypto.randomUUID(),
+          question_id: payloadQuestions[qIndex].id,
+          body: choice.body?.trim() ? choice.body.trim() : 'Pilihan',
+          is_correct: Boolean(choice.is_correct),
+        }))
   )
 
   if (payloadQuestions.length > 0) {
@@ -190,6 +200,9 @@ function normalizeQuizSet(row: any): QuizSet {
       ...question,
       time_limit: question.time_limit ?? DEFAULT_TIME_LIMIT,
       points: question.points ?? DEFAULT_POINTS,
+      question_type: question.question_type ?? 'choice',
+      text_answer: question.text_answer ?? null,
+      text_exact: question.text_exact ?? false,
       choices: (question.choices ?? [])
         .slice()
         .sort((a: Choice, b: Choice) =>

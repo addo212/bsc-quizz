@@ -2,8 +2,8 @@
 
 import { Answer, GameResult, Participant, Question } from '@/types/types'
 import { ANSWER_STYLES } from '@/constants'
-import { cn, formatNumber } from '@/lib/utils'
-import { AnswerShape, CheckIcon, CountdownRing } from '@/components/game-ui'
+import { cn, formatNumber, isTextAnswerCorrect } from '@/lib/utils'
+import { AnswerShape, CheckIcon, CountdownRing, CrossIcon } from '@/components/game-ui'
 import { Avatar } from '@/components/player-chip'
 import { Badge, Button } from '@/components/ui'
 
@@ -41,6 +41,8 @@ export function HostQuiz({
   )
   const maxCount = Math.max(1, ...counts)
   const answeredRatio = players.length > 0 ? answers.length / players.length : 0
+
+  const isTextQuestion = question.question_type === 'text'
 
   return (
     <div className="min-h-screen bg-slate-950">
@@ -117,7 +119,21 @@ export function HostQuiz({
             {question.body}
           </h2>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-2">
+          {isTextQuestion && (
+            <TextQuestionBoard
+              question={question}
+              answers={answers}
+              players={players}
+              revealed={revealed}
+            />
+          )}
+
+          <div
+            className={cn(
+              'mt-6 grid gap-3 sm:grid-cols-2',
+              isTextQuestion && 'hidden'
+            )}
+          >
             {question.choices.map((choice, choiceIndex) => {
               const style = ANSWER_STYLES[choiceIndex % ANSWER_STYLES.length]
               const count = counts[choiceIndex]
@@ -250,6 +266,139 @@ export function HostQuiz({
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Soal dengan jawaban yang diketik                                          */
+/* -------------------------------------------------------------------------- */
+
+function TextQuestionBoard({
+  question,
+  answers,
+  players,
+  revealed,
+}: {
+  question: Question
+  answers: Answer[]
+  players: Participant[]
+  revealed: boolean
+}) {
+  const isCorrect = (answer: Answer) =>
+    isTextAnswerCorrect({
+      given: answer.free_text,
+      key: question.text_answer,
+      exact: question.text_exact,
+    })
+
+  const rows = answers.map((answer) => ({
+    id: answer.id,
+    nickname:
+      players.find((player) => player.id === answer.participant_id)?.nickname ??
+      'Pemain',
+    text: answer.free_text ?? '',
+    correct: isCorrect(answer),
+  }))
+
+  const correctCount = rows.filter((row) => row.correct).length
+  const wrongCount = rows.length - correctCount
+
+  // Sebelum dibuka: jangan bocorkan kunci jawaban ke layar besar.
+  if (!revealed) {
+    return (
+      <div className="mt-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-14 text-center">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-white/10 text-white/70">
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            strokeWidth={1.7}
+            stroke="currentColor"
+            className="h-7 w-7"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.862 4.487l1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L6.832 19.82a4.5 4.5 0 0 1-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 0 1 1.13-1.897L16.863 4.487Z"
+            />
+          </svg>
+        </div>
+        <p className="mt-5 font-display text-xl font-extrabold text-white">
+          Pemain mengetik jawaban
+        </p>
+        <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-white/50">
+          {answers.length} dari {players.length} pemain sudah mengirim jawaban.
+          Kunci jawaban disembunyikan sampai Anda menekan &ldquo;Tampilkan
+          jawaban&rdquo;.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="animate-pop mt-6 space-y-4">
+      <div className="rounded-3xl border border-emerald-400/30 bg-emerald-500/10 px-6 py-7 text-center">
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/70">
+          Kunci jawaban
+        </p>
+        <p className="mt-2 font-display text-2xl font-extrabold leading-snug text-white sm:text-4xl">
+          {question.text_answer ?? '—'}
+        </p>
+        {question.text_exact && (
+          <p className="mt-2 text-xs text-white/40">
+            Wajib sama persis, termasuk huruf besar/kecil
+          </p>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
+          <p className="font-display text-2xl font-extrabold tabular-nums text-emerald-300">
+            {correctCount}
+          </p>
+          <p className="text-xs text-white/50">Benar</p>
+        </div>
+        <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center">
+          <p className="font-display text-2xl font-extrabold tabular-nums text-rose-300">
+            {wrongCount}
+          </p>
+          <p className="text-xs text-white/50">Salah</p>
+        </div>
+      </div>
+
+      {rows.length > 0 && (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-wider text-white/40">
+            Jawaban tiap pemain
+          </p>
+          <ul className="space-y-2">
+            {rows.map((row) => (
+              <li
+                key={row.id}
+                className="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2"
+              >
+                <Avatar name={row.nickname} size="sm" />
+                <span className="w-24 shrink-0 truncate text-sm font-semibold text-white sm:w-36">
+                  {row.nickname}
+                </span>
+                <span
+                  className={cn(
+                    'min-w-0 flex-1 truncate text-right font-display text-sm font-bold',
+                    row.correct ? 'text-emerald-300' : 'text-rose-300'
+                  )}
+                >
+                  {row.text || '—'}
+                </span>
+                {row.correct ? (
+                  <CheckIcon className="h-4 w-4 shrink-0 text-emerald-400" />
+                ) : (
+                  <CrossIcon className="h-4 w-4 shrink-0 text-rose-400" />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

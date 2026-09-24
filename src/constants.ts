@@ -20,6 +20,23 @@ export const MAX_NAME_LENGTH = 80
  */
 export const SPEED_PENALTY = 0.5
 
+/** Jenis soal yang didukung */
+export const QUESTION_TYPES = [
+  {
+    id: 'choice',
+    label: 'Pilihan ganda',
+    hint: 'Pemain memilih satu dari 2–4 jawaban.',
+  },
+  {
+    id: 'text',
+    label: 'Jawaban diketik',
+    hint: 'Pemain mengetik jawabannya, harus sama dengan kunci jawaban.',
+  },
+] as const
+
+/** Batas panjang jawaban yang diketik pemain */
+export const MAX_TEXT_ANSWER_LENGTH = 80
+
 /** Opsi tema warna cover quiz */
 export const COVER_COLORS = [
   { id: 'violet', label: 'Violet', from: '#7c3aed', to: '#c026d3' },

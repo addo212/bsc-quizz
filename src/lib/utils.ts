@@ -43,6 +43,35 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat('id-ID').format(value)
 }
 
+/* -------------------------------------------------------------------------- */
+/*  Pencocokan jawaban yang diketik                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Menormalkan jawaban teks sebelum dibandingkan.
+ *
+ * Selalu: buang spasi di ujung + rapikan spasi ganda.
+ * Kalau `exact` false (default): huruf besar/kecil diabaikan.
+ */
+export function normalizeTextAnswer(value: string, exact = false) {
+  const collapsed = value.replace(/\s+/g, ' ').trim()
+  return exact ? collapsed : collapsed.toLocaleLowerCase('id-ID')
+}
+
+/** true kalau jawaban pemain sama dengan kunci jawaban. */
+export function isTextAnswerCorrect({
+  given,
+  key,
+  exact = false,
+}: {
+  given: string | null | undefined
+  key: string | null | undefined
+  exact?: boolean
+}) {
+  if (!given || !key) return false
+  return normalizeTextAnswer(given, exact) === normalizeTextAnswer(key, exact)
+}
+
 /** Inisial untuk avatar: "Rizky Putra" -> "RP" */
 export function initials(name: string) {
   return name

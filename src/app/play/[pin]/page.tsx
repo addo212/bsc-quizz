@@ -264,7 +264,19 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
     0
   )
 
-  const handleAnswer = async (choice: Choice, answeredAt: number) => {
+  /**
+   * Mengirim jawaban pemain — dipakai untuk pilihan ganda maupun jawaban teks.
+   * Tombol dikunci secara optimistis supaya terasa responsif.
+   */
+  const sendAnswer = async ({
+    choiceId,
+    freeText,
+    answeredAt,
+  }: {
+    choiceId?: string
+    freeText?: string
+    answeredAt: number
+  }) => {
     const current = gameRef.current
     const me = participantRef.current
     const question = currentQuestion
@@ -286,7 +298,8 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
         created_at: new Date().toISOString(),
         participant_id: me.id,
         question_id: question.id,
-        choice_id: choice.id,
+        choice_id: choiceId ?? null,
+        free_text: freeText?.trim() ? freeText.trim() : null,
         score: 0,
         time_taken_ms: elapsedMs,
       },
@@ -296,7 +309,8 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
       await submitAnswer({
         participantId: me.id,
         questionId: question.id,
-        choiceId: choice.id,
+        choiceId: choiceId ?? null,
+        freeText: freeText ?? null,
         timeTakenMs: elapsedMs,
       })
     } catch (caught) {
@@ -313,6 +327,14 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
     } finally {
       setSubmitting(false)
     }
+  }
+
+  const handleAnswerChoice = (choice: Choice, answeredAt: number) => {
+    void sendAnswer({ choiceId: choice.id, answeredAt })
+  }
+
+  const handleAnswerText = (text: string, answeredAt: number) => {
+    void sendAnswer({ freeText: text, answeredAt })
   }
 
   /* ------------------------------- 6. Render -------------------------------- */
@@ -400,7 +422,8 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
       totalScore={totalScore}
       nickname={participant.nickname}
       submitting={submitting}
-      onAnswer={handleAnswer}
+      onAnswerChoice={handleAnswerChoice}
+      onAnswerText={handleAnswerText}
     />
   )
 }

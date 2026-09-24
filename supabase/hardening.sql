@@ -43,12 +43,20 @@ as $$
                 'order',    q."order",
                 'time_limit', q.time_limit,
                 'points',   q.points,
+                'question_type', coalesce(q.question_type, 'choice'),
+                'text_exact',    coalesce(q.text_exact, false),
+                -- kunci jawaban hanya dikirim saat jawaban sudah di-reveal
+                'text_answer',
+                    case
+                        when r.is_revealed and q."order" = r.current_seq
+                            then q.text_answer
+                        else null
+                    end,
                 'choices',  (
                     select coalesce(jsonb_agg(
                         jsonb_build_object(
                             'id',   c.id,
                             'body', c.body,
-                            -- kunci hanya dikirim saat jawaban sudah di-reveal
                             'is_correct',
                                 case
                                     when r.is_revealed and q."order" = r.current_seq

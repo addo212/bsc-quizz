@@ -1,9 +1,15 @@
 'use client'
 
+import { FormEvent, useEffect, useState } from 'react'
 import { Answer, Choice, Question } from '@/types/types'
-import { ANSWER_STYLES } from '@/constants'
-import { cn, formatNumber } from '@/lib/utils'
-import { AnswerShape, CheckIcon, CountdownRing, CrossIcon } from '@/components/game-ui'
+import { ANSWER_STYLES, MAX_TEXT_ANSWER_LENGTH } from '@/constants'
+import { cn, formatNumber, isTextAnswerCorrect } from '@/lib/utils'
+import {
+  AnswerShape,
+  CheckIcon,
+  CountdownRing,
+  CrossIcon,
+} from '@/components/game-ui'
 
 export function PlayerQuiz({
   question,
@@ -14,7 +20,8 @@ export function PlayerQuiz({
   totalScore,
   nickname,
   submitting,
-  onAnswer,
+  onAnswerChoice,
+  onAnswerText,
 }: {
   question: Question
   index: number
@@ -24,13 +31,26 @@ export function PlayerQuiz({
   totalScore: number
   nickname: string
   submitting: boolean
-  onAnswer: (choice: Choice, elapsedMs: number) => void
+  onAnswerChoice: (choice: Choice, answeredAt: number) => void
+  onAnswerText: (text: string, answeredAt: number) => void
 }) {
+  const isTextQuestion = question.question_type === 'text'
   const chosenId = myAnswer?.choice_id ?? null
   const correctIds = question.choices
     .filter((choice) => choice.is_correct)
     .map((choice) => choice.id)
-  const isCorrect = chosenId ? correctIds.includes(chosenId) : false
+
+  const isCorrect = isTextQuestion
+    ? isTextAnswerCorrect({
+        given: myAnswer?.free_text,
+        key: question.text_answer,
+        exact: question.text_exact,
+      })
+    : chosenId
+      ? correctIds.includes(chosenId)
+      : false
+
+  const hasAnswered = Boolean(myAnswer)
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950">
@@ -76,52 +96,72 @@ export function PlayerQuiz({
         <h2 className="animate-slide-up rounded-2xl bg-white px-5 py-5 text-center font-display text-lg font-extrabold leading-snug text-slate-900 shadow-xl sm:text-2xl">
           {question.body}
         </h2>
+        {isTextQuestion && !isAnswerRevealed && !hasAnswered && (
+          <p className="mt-3 text-center text-xs font-semibold uppercase tracking-wider text-violet-300">
+            Ketik jawabanmu
+          </p>
+        )}
       </div>
 
-      {/* Jawaban */}
-      <div className="grid flex-1 grid-cols-1 content-start gap-2.5 p-4 sm:grid-cols-2 sm:gap-3 sm:p-6">
-        {question.choices.map((choice, choiceIndex) => {
-          const style = ANSWER_STYLES[choiceIndex % ANSWER_STYLES.length]
-          const isChosen = chosenId === choice.id
-          const isRight = correctIds.includes(choice.id)
-          const showResult = isAnswerRevealed || Boolean(chosenId)
+      {/* Area jawaban */}
+      {isTextQuestion ? (
+        <TextAnswerArea
+          question={question}
+          myAnswer={myAnswer}
+          isAnswerRevealed={isAnswerRevealed}
+          isCorrect={isCorrect}
+          submitting={submitting}
+          onSubmit={onAnswerText}
+        />
+      ) : (
+        <div className="grid flex-1 grid-cols-1 content-start gap-2.5 p-4 sm:grid-cols-2 sm:gap-3 sm:p-6">
+          {question.choices.map((choice, choiceIndex) => {
+            const style = ANSWER_STYLES[choiceIndex % ANSWER_STYLES.length]
+            const isChosen = chosenId === choice.id
+            const isRight = correctIds.includes(choice.id)
+            const showResult = isAnswerRevealed || hasAnswered
 
-          return (
-            <button
-              key={choice.id}
-              type="button"
-              disabled={Boolean(chosenId) || isAnswerRevealed || submitting}
-              onClick={() => onAnswer(choice, Date.now())}
-              className={cn(
-                'group relative flex min-h-[76px] w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition-all duration-200 sm:min-h-[92px] sm:px-5',
-                style.bg,
-                'text-white shadow-lg',
-                !chosenId && !isAnswerRevealed && 'active:scale-[0.98] hover:brightness-110',
-                showResult && !isChosen && !isRight && 'opacity-35 saturate-50',
-                showResult && isRight && 'ring-4 ring-white/80',
-                showResult && isChosen && !isRight && 'ring-4 ring-slate-900/40'
-              )}
-            >
-              <AnswerShape index={choiceIndex} className="h-5 w-5 sm:h-6 sm:w-6" />
-              <span className="flex-1 font-display text-base font-bold leading-snug sm:text-lg">
-                {choice.body}
-              </span>
-              {showResult && isRight && <CheckIcon className="h-6 w-6" />}
-              {showResult && isChosen && !isRight && <CrossIcon className="h-6 w-6" />}
-            </button>
-          )
-        })}
-      </div>
+            return (
+              <button
+                key={choice.id}
+                type="button"
+                disabled={hasAnswered || isAnswerRevealed || submitting}
+                onClick={() => onAnswerChoice(choice, Date.now())}
+                className={cn(
+                  'group relative flex min-h-[76px] w-full items-center gap-3 rounded-2xl px-4 py-4 text-left transition-all duration-200 sm:min-h-[92px] sm:px-5',
+                  style.bg,
+                  'text-white shadow-lg',
+                  !hasAnswered &&
+                    !isAnswerRevealed &&
+                    'active:scale-[0.98] hover:brightness-110',
+                  showResult && !isChosen && !isRight && 'opacity-35 saturate-50',
+                  showResult && isRight && 'ring-4 ring-white/80',
+                  showResult && isChosen && !isRight && 'ring-4 ring-slate-900/40'
+                )}
+              >
+                <AnswerShape index={choiceIndex} className="h-5 w-5 sm:h-6 sm:w-6" />
+                <span className="flex-1 font-display text-base font-bold leading-snug sm:text-lg">
+                  {choice.body}
+                </span>
+                {showResult && isRight && <CheckIcon className="h-6 w-6" />}
+                {showResult && isChosen && !isRight && (
+                  <CrossIcon className="h-6 w-6" />
+                )}
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Status bawah */}
       <div className="safe-bottom sticky bottom-0 border-t border-white/5 bg-slate-950/90 px-4 py-3 backdrop-blur sm:px-6">
-        {!chosenId && !isAnswerRevealed && (
+        {!hasAnswered && !isAnswerRevealed && !isTextQuestion && (
           <p className="text-center text-sm font-medium text-white/50">
             Tap salah satu jawaban secepat mungkin ⚡
           </p>
         )}
 
-        {chosenId && !isAnswerRevealed && (
+        {hasAnswered && !isAnswerRevealed && (
           <p className="text-center text-sm font-semibold text-white/70">
             Jawaban terkirim! Menunggu pemain lain…
           </p>
@@ -139,7 +179,11 @@ export function PlayerQuiz({
             </span>
             <div className="text-left">
               <p className="font-display text-base font-extrabold text-white">
-                {isCorrect ? 'Benar!' : chosenId ? 'Kurang tepat' : 'Tidak menjawab'}
+                {isCorrect
+                  ? 'Benar!'
+                  : hasAnswered
+                    ? 'Kurang tepat'
+                    : 'Tidak menjawab'}
               </p>
               <p className="text-xs text-white/60">
                 {isCorrect
@@ -148,6 +192,122 @@ export function PlayerQuiz({
               </p>
             </div>
           </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Jawaban yang diketik                                                      */
+/* -------------------------------------------------------------------------- */
+
+function TextAnswerArea({
+  question,
+  myAnswer,
+  isAnswerRevealed,
+  isCorrect,
+  submitting,
+  onSubmit,
+}: {
+  question: Question
+  myAnswer: Answer | null
+  isAnswerRevealed: boolean
+  isCorrect: boolean
+  submitting: boolean
+  onSubmit: (text: string, answeredAt: number) => void
+}) {
+  const [text, setText] = useState('')
+
+  useEffect(() => {
+    setText('')
+  }, [question.id])
+
+  const locked = Boolean(myAnswer) || isAnswerRevealed || submitting
+
+  const handleSubmit = (event: FormEvent) => {
+    event.preventDefault()
+    if (locked) return
+    const value = text.trim()
+    if (value.length === 0) return
+    onSubmit(value, Date.now())
+  }
+
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center px-4 py-8 sm:px-6">
+      <div className="w-full max-w-lg">
+        {isAnswerRevealed ? (
+          <div className="animate-pop space-y-3">
+            <div
+              className={cn(
+                'rounded-2xl border px-5 py-4 text-center',
+                isCorrect
+                  ? 'border-emerald-400/30 bg-emerald-500/10'
+                  : 'border-rose-400/30 bg-rose-500/10'
+              )}
+            >
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+                Jawabanmu
+              </p>
+              <p className="mt-1 font-display text-xl font-extrabold text-white">
+                {myAnswer?.free_text ?? '— tidak dijawab —'}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-center">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/40">
+                Kunci jawaban
+              </p>
+              <p className="mt-1 font-display text-xl font-extrabold text-emerald-300">
+                {question.text_answer ?? '—'}
+              </p>
+              {question.text_exact && (
+                <p className="mt-1 text-[11px] text-white/40">
+                  Wajib sama persis (peka huruf besar/kecil)
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="animate-pop">
+            <input
+              value={text}
+              onChange={(event) =>
+                setText(event.target.value.slice(0, MAX_TEXT_ANSWER_LENGTH))
+              }
+              disabled={locked}
+              autoFocus
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              placeholder="Ketik jawabanmu…"
+              className={cn(
+                'h-16 w-full rounded-2xl border bg-white/10 px-5 text-center',
+                'font-display text-xl font-bold text-white',
+                'placeholder:text-white/30 focus:outline-none focus:ring-4',
+                locked
+                  ? 'border-white/10 opacity-60'
+                  : 'border-white/20 focus:border-violet-400 focus:ring-violet-500/20'
+              )}
+            />
+
+            <button
+              type="submit"
+              disabled={locked || text.trim().length === 0}
+              className={cn(
+                'mt-4 h-14 w-full rounded-2xl font-semibold tracking-tight transition',
+                'bg-violet-600 text-white shadow-lg shadow-violet-600/25',
+                'hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40'
+              )}
+            >
+              {submitting ? 'Mengirim…' : 'Kirim jawaban'}
+            </button>
+
+            <p className="mt-3 text-center text-xs text-white/40">
+              Tekan Enter untuk mengirim · {text.length}/{MAX_TEXT_ANSWER_LENGTH}
+            </p>
+          </form>
         )}
       </div>
     </div>

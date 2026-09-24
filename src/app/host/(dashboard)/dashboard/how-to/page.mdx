@@ -11,13 +11,20 @@ Panduan singkat untuk host dan pemain.
 3. Isi judul, deskripsi, dan pilih warna cover.
 4. Isi soal pertama:
    - **Pertanyaan** — teks soal.
+   - **Tipe soal** — pilih salah satu:
+     - **Pilihan ganda** — pemain memilih satu dari 2–4 jawaban. Klik kotak
+       warna di sisi kiri untuk menandai jawaban yang benar (satu jawaban benar
+       per soal).
+     - **Jawaban diketik** — pemain mengetik jawabannya. Isi **Kunci jawaban**,
+       lalu centang *Wajib sama persis* kalau huruf besar/kecil ikut dinilai.
+       Kalau tidak dicentang, `zainul arifin` dan `Zainul Arifin` sama-sama
+       dianggap benar — spasi berlebih di awal/akhir dan spasi ganda selalu
+       diabaikan.
    - **URL gambar** — opsional, untuk soal bergambar.
    - **Waktu menjawab** — 5 sampai 120 detik per soal.
    - **Poin maksimal** — pemain yang menjawab instan mendapat poin penuh,
      yang menjawab tepat di detik terakhir mendapat setengah poin.
      Isi `0` kalau soal tidak perlu dinilai.
-   - **Pilihan jawaban** — minimal 2, maksimal 4. Klik kotak warna di sisi kiri
-     untuk menandai jawaban yang benar (hanya satu jawaban benar per soal).
 5. Tambah soal lain lewat tombol **+ Soal** di deretan nomor soal.
 6. Klik **Simpan**. Tombol **▶ Mainkan** otomatis menyimpan lalu membuka ruangan.
 
@@ -39,6 +46,8 @@ Tekan **▶ Mulai permainan** kalau pemain sudah berkumpul.
   sudah menjawab. Anda juga bisa menekan **Tampilkan jawaban** lebih awal.
 - Setelah dibuka, grafik batang menunjukkan sebaran jawaban dan jawaban benar
   ditandai. Skor dihitung otomatis saat itu juga.
+- Untuk soal **jawaban diketik**, kunci jawaban ditampilkan besar-besar beserta
+  jumlah benar/salah dan daftar jawaban setiap pemain.
 - Klik **Soal berikutnya** untuk lanjut, atau **Akhiri permainan** untuk
   langsung ke hasil akhir.
 
@@ -53,8 +62,11 @@ mengembalikan semua pemain ke lobby memakai PIN yang sama.
 1. Buka tautan aplikasi (atau scan QR dari layar host).
 2. Masukkan PIN 6 angka.
 3. Pilih nickname — klik 🎲 untuk nama acak.
-4. Tekan tombol jawaban secepat mungkin. Warna dan bentuk tiap pilihan berbeda
-   supaya mudah dikenali.
+4. Jawab secepat mungkin:
+   - Soal **pilihan ganda**: tap salah satu tombol. Warna dan bentuk tiap
+     pilihan berbeda supaya mudah dikenali.
+   - Soal **jawaban diketik**: ketik jawaban di kotak yang tersedia, lalu tekan
+     **Kirim jawaban** atau tombol Enter.
 5. Skor langsung diperbarui setelah jawaban dibuka.
 
 ## Tips
@@ -70,17 +82,36 @@ mengembalikan semua pemain ke lobby memakai PIN yang sama.
 
 ```json
 {
-  "name": "Kuis Ibu Kota",
+  "name": "Kuis Accounting",
   "questions": [
     {
       "body": "Ibu kota Australia?",
+      "type": "choice",
       "time_limit": 20,
       "points": 1000,
       "choices": [
         { "body": "Sydney", "is_correct": false },
         { "body": "Canberra", "is_correct": true }
       ]
+    },
+    {
+      "body": "Siapakah member accounting paling ganteng?",
+      "type": "text",
+      "text_answer": "Zainul Arifin",
+      "text_exact": false,
+      "time_limit": 30,
+      "points": 1000
     }
   ]
 }
 ```
+
+Catatan untuk soal bertipe `text`:
+
+- `text_answer` wajib diisi — itu kunci jawabannya.
+- `text_exact` opsional (default `false`). Isi `true` kalau huruf besar/kecil
+  harus sama persis.
+- Bagian `choices` tidak diperlukan.
+
+Soal dianggap bertipe teks kalau `type` bernilai `"text"`, atau kalau hanya ada
+`text_answer` tanpa `choices`.

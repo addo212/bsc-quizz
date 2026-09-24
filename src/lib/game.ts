@@ -181,17 +181,20 @@ export async function submitAnswer({
   participantId,
   questionId,
   choiceId,
+  freeText,
   timeTakenMs,
 }: {
   participantId: string
   questionId: string
-  choiceId: string
+  choiceId?: string | null
+  freeText?: string | null
   timeTakenMs: number
 }) {
   const { error } = await supabase.from('answers').insert({
     participant_id: participantId,
     question_id: questionId,
-    choice_id: choiceId,
+    choice_id: choiceId ?? null,
+    free_text: freeText?.trim() ? freeText.trim() : null,
     score: 0,
     time_taken_ms: Math.max(0, Math.round(timeTakenMs)),
   })
@@ -301,6 +304,9 @@ export async function fetchGameQuestions(
       quiz_set_id: quizSetId,
       time_limit: question.time_limit ?? 20,
       points: question.points ?? 1000,
+      question_type: question.question_type ?? 'choice',
+      text_answer: question.text_answer ?? null,
+      text_exact: question.text_exact ?? false,
       choices: (question.choices ?? []).map((choice) => ({
         id: choice.id,
         created_at: '',

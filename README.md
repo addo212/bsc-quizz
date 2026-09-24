@@ -23,8 +23,12 @@ penilaian aman di sisi host, dan UI yang ramah HP maupun desktop.
 
 ## Fitur
 
-- **Halaman pembuatan kuis** — CRUD soal, 2–4 pilihan jawaban, penanda jawaban
-  benar, waktu menjawab per soal, poin per soal, warna cover, gambar soal.
+- **Halaman pembuatan kuis** — CRUD soal, penanda jawaban benar, waktu
+  menjawab per soal, poin per soal, warna cover, gambar soal.
+- **Dua tipe soal** — **pilihan ganda** (2–4 jawaban) dan **jawaban diketik**,
+  di mana pemain harus mengetik jawaban yang sama dengan kunci jawaban.
+  Tersedia opsi "wajib sama persis" (peka huruf besar/kecil); kalau tidak
+  diaktifkan, huruf besar/kecil diabaikan dan spasi berlebih selalu dirapikan.
 - **Impor & ekspor JSON** — backup atau bagi-bagi kuis dengan mudah.
 - **PIN 6 angka + QR code** — pemain langsung masuk tanpa install apa pun.
 - **Layar host** — timer besar, hitungan jawaban masuk, grafik batang sebaran
@@ -231,7 +235,7 @@ scripts/
 | Tabel | Isi |
 | --- | --- |
 | `quiz_sets` | Judul, deskripsi, pemilik, warna cover, publik/privat |
-| `questions` | Soal, gambar, urutan, batas waktu, poin |
+| `questions` | Soal, gambar, urutan, batas waktu, poin, tipe soal, kunci jawaban teks |
 | `choices` | Pilihan jawaban + penanda `is_correct` |
 | `games` | Satu sesi permainan: PIN, fase (`lobby`/`quiz`/`result`) |
 | `participants` | Nickname pemain dalam satu sesi |
@@ -255,6 +259,40 @@ setelah `setup.sql`. Skrip itu:
 
 Aplikasi otomatis memakai fungsi tersebut kalau ada, dan jatuh kembali ke
 pembacaan tabel biasa kalau belum dipasang — jadi aman dijalankan kapan saja.
+
+## Update schema (database yang sudah pernah dipakai)
+
+Kalau database Anda sudah dibuat **sebelum** fitur *jawaban diketik* ada,
+jalankan potongan SQL ini sekali di **Supabase → SQL Editor**:
+
+```sql
+alter table public.questions
+    add column if not exists question_type text default 'choice' not null,
+    add column if not exists text_answer   text,
+    add column if not exists text_exact    boolean default false not null;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'questions_question_type_check'
+    ) then
+        alter table public.questions
+            add constraint questions_question_type_check
+            check (question_type in ('choice', 'text'));
+    end if;
+end $$;
+
+alter table public.answers
+    add column if not exists free_text text;
+```
+
+Kalau `supabase/hardening.sql` juga sudah pernah dijalankan, jalankan ulang file
+itu supaya fungsi `get_game_questions()` ikut menyembunyikan `text_answer`
+sampai jawaban di-reveal.
+
+> Belum pernah menjalankan apa pun? Cukup jalankan
+> [`supabase/setup.sql`](supabase/setup.sql) — skripnya idempoten, jadi aman
+> dijalankan berulang kali.
 
 ## Aturan penilaian
 

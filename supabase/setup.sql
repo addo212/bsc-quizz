@@ -43,7 +43,24 @@ create table if not exists public.questions (
 
 alter table public.questions
     add column if not exists time_limit smallint default 20   not null,
-    add column if not exists points     smallint default 1000 not null;
+    add column if not exists points     smallint default 1000 not null,
+    -- 'choice' = pilihan ganda, 'text' = jawaban diketik pemain
+    add column if not exists question_type text default 'choice' not null,
+    -- kunci jawaban untuk soal bertipe 'text'
+    add column if not exists text_answer text,
+    -- true = wajib sama persis termasuk huruf besar/kecil
+    add column if not exists text_exact boolean default false not null;
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'questions_question_type_check'
+    ) then
+        alter table public.questions
+            add constraint questions_question_type_check
+            check (question_type in ('choice', 'text'));
+    end if;
+end $$;
 
 -- Pilihan jawaban ------------------------------------------------------------
 create table if not exists public.choices (
@@ -112,7 +129,9 @@ create table if not exists public.answers (
 
 alter table public.answers
     add column if not exists time_taken_ms integer default 0 not null,
-    add column if not exists choice_id uuid references public.choices (id) on delete set null on update cascade;
+    add column if not exists choice_id uuid references public.choices (id) on delete set null on update cascade,
+    -- jawaban yang diketik pemain, dipakai untuk soal bertipe 'text'
+    add column if not exists free_text text;
 
 -- Perbaikan: default lama `auth.uid()` salah (itu user id, bukan participant id).
 -- Aplikasi selalu mengirim `participant_id` secara eksplisit.
