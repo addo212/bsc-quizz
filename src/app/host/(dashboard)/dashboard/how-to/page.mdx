@@ -1,0 +1,86 @@
+# Cara pakai BSC Quiz
+
+Panduan singkat untuk host dan pemain.
+
+## Untuk host
+
+### 1. Buat kuis
+
+1. Buka **Kuis Saya** di sidebar.
+2. Klik **+ Buat kuis baru**.
+3. Isi judul, deskripsi, dan pilih warna cover.
+4. Isi soal pertama:
+   - **Pertanyaan** — teks soal.
+   - **URL gambar** — opsional, untuk soal bergambar.
+   - **Waktu menjawab** — 5 sampai 120 detik per soal.
+   - **Poin maksimal** — pemain yang menjawab instan mendapat poin penuh,
+     yang menjawab tepat di detik terakhir mendapat setengah poin.
+     Isi `0` kalau soal tidak perlu dinilai.
+   - **Pilihan jawaban** — minimal 2, maksimal 4. Klik kotak warna di sisi kiri
+     untuk menandai jawaban yang benar (hanya satu jawaban benar per soal).
+5. Tambah soal lain lewat tombol **+ Soal** di deretan nomor soal.
+6. Klik **Simpan**. Tombol **▶ Mainkan** otomatis menyimpan lalu membuka ruangan.
+
+### 2. Buka ruangan
+
+Setelah menekan **▶ Mainkan**, layar host menampilkan:
+
+- **PIN 6 angka** — bacakan ke pemain.
+- **QR code** — pemain tinggal scan dengan kamera HP.
+- **Daftar pemain** yang masuk secara realtime.
+
+Tekan **▶ Mulai permainan** kalau pemain sudah berkumpul.
+
+### 3. Jalankan permainan
+
+- Soal muncul dengan timer besar. Bilah di kanan menunjukkan berapa pemain yang
+  sudah menjawab.
+- Jawaban otomatis dibuka ketika waktu habis **atau** ketika semua pemain
+  sudah menjawab. Anda juga bisa menekan **Tampilkan jawaban** lebih awal.
+- Setelah dibuka, grafik batang menunjukkan sebaran jawaban dan jawaban benar
+  ditandai. Skor dihitung otomatis saat itu juga.
+- Klik **Soal berikutnya** untuk lanjut, atau **Akhiri permainan** untuk
+  langsung ke hasil akhir.
+
+### 4. Hasil akhir
+
+Podium juara 1–3 muncul dengan animasi confetti, diikuti tabel peringkat
+lengkap. Tombol **↻ Main lagi dengan kuis ini** mengosongkan skor dan
+mengembalikan semua pemain ke lobby memakai PIN yang sama.
+
+## Untuk pemain
+
+1. Buka tautan aplikasi (atau scan QR dari layar host).
+2. Masukkan PIN 6 angka.
+3. Pilih nickname — klik 🎲 untuk nama acak.
+4. Tekan tombol jawaban secepat mungkin. Warna dan bentuk tiap pilihan berbeda
+   supaya mudah dikenali.
+5. Skor langsung diperbarui setelah jawaban dibuka.
+
+## Tips
+
+- **Satu perangkat satu pemain.** Beberapa pemain bisa memakai HP masing-masing.
+- Pemain tidak perlu membuat akun — sesi tamu otomatis dibuat.
+- Host sebaiknya membuat akun email supaya kuis tersimpan permanen dan bisa
+  dibuka dari laptop lain.
+- Gunakan **Unduh JSON** di editor untuk membackup kuis, dan **Impor JSON** untuk
+  memuatnya kembali atau membagikannya.
+
+## Format file impor
+
+```json
+{
+  "name": "Kuis Ibu Kota",
+  "questions": [
+    {
+      "body": "Ibu kota Australia?",
+      "time_limit": 20,
+      "points": 1000,
+      "choices": [
+        { "body": "Sydney", "is_correct": false },
+        { "body": "Canberra", "is_correct": true }
+      ]
+    }
+  ]
+}
+```

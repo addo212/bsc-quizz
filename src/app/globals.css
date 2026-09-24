@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --font-inter: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply bg-slate-50 font-sans text-slate-900 antialiased;
+    padding: 0;
+  }
+
+  /* Angka timer tidak "bergoyang" saat berubah */
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+
+  ::selection {
+    @apply bg-violet-200 text-violet-900;
+  }
+}
+
+@layer utilities {
+  /* Ruang aman untuk iPhone (notch & home indicator) */
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Scrollbar tipis untuk daftar panjang */
+  .thin-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.5) transparent;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .thin-scrollbar::-webkit-scrollbar-thumb {
+    background-color: rgba(148, 163, 184, 0.5);
+    border-radius: 9999px;
+  }
+}
+
+/* Cegah tombol jawaban "ter-highlight" biru di Android saat ditap */
+button {
+  -webkit-touch-callout: none;
+}
