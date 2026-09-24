@@ -155,7 +155,7 @@ export default function HomePage() {
                   Peringkat 1
                 </p>
                 <p className="font-display text-sm font-bold text-slate-900">
-                  Rizky P.
+                  Rahmat Wicaksono
                 </p>
                 <p className="text-xs font-semibold text-emerald-600">
                   +940 poin
