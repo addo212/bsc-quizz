@@ -2,116 +2,152 @@ import Link from 'next/link'
 import { JoinBox } from '@/components/JoinBox'
 import { ButtonLink, Logo } from '@/components/ui'
 
-const FEATURES = [
+const REPO_URL = 'https://github.com/supabase-community/kahoot-alternative'
+
+/** Teks kecil di strip paling atas — penanda bahwa ini versi yang sudah disesuaikan. */
+const EDITION_NOTE =
+  'Edisi BSC Accounting 2026 · disesuaikan oleh addo dari kahoot-alternative (MIT)'
+
+const SPECS = [
   {
-    title: 'Buat kuis dalam hitungan menit',
-    body: 'Tambahkan soal, atur waktu menjawab dan poin, tandai jawaban benar. Tanpa batas jumlah soal.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.7} stroke="currentColor" className="h-5 w-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-      </svg>
-    ),
+    title: 'Pembuat kuis',
+    body: 'Tulis soal, atur batas waktu dan poin, tandai jawaban benar, dan simpan sebagai draf. Bisa juga impor & ekspor lewat file JSON untuk backup atau berbagi antar panitia.',
   },
   {
-    title: 'Pemain gabung pakai PIN',
-    body: 'Cukup buka tautan di HP, masukkan PIN 6 angka dan nickname. Tidak perlu bikin akun.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.7} stroke="currentColor" className="h-5 w-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m1.5-3a4.5 4.5 0 0 0-4.5-4.5M6 15.75h12M6 19.5h12M4.5 12h15" />
-      </svg>
-    ),
+    title: 'Dua tipe soal',
+    body: 'Pilihan ganda untuk jawaban cepat, atau jawaban diketik yang harus sama dengan kunci — dengan opsi wajib sama persis bila huruf besar/kecil ikut dinilai.',
   },
   {
-    title: 'Skor realtime & podium',
-    body: 'Grafik jawaban muncul langsung di layar host, skor pemain naik seketika, diakhiri podium juara.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.7} stroke="currentColor" className="h-5 w-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 20.25h18M6.75 20.25V9.75m5.25 10.5V4.5m5.25 15.75V13.5" />
-      </svg>
-    ),
+    title: 'PIN & QR ruangan',
+    body: 'Setiap sesi punya PIN 6 angka dan QR code. Pemain cukup membuka tautan di HP, memasukkan PIN, memilih nickname — tidak perlu memasang apa pun.',
   },
   {
-    title: 'Ramah HP & desktop',
-    body: 'Layar host tampil lebar di laptop/proyektor, tombol jawaban besar dan enak ditap di ponsel.',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.7} stroke="currentColor" className="h-5 w-5">
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5h3m-9 21h15a1.5 1.5 0 0 0 1.5-1.5V3a1.5 1.5 0 0 0-1.5-1.5h-15A1.5 1.5 0 0 0 3 3v18a1.5 1.5 0 0 0 1.5 1.5Z" />
-      </svg>
-    ),
+    title: 'Layar host',
+    body: 'Timer besar, hitungan jawaban yang masuk, grafik sebaran jawaban saat dibuka, dan papan skor sementara yang naik seketika.',
+  },
+  {
+    title: 'Podium & riwayat',
+    body: 'Hasil akhir tampil sebagai podium juara dengan tabel peringkat lengkap, dan bisa dimainkan ulang memakai PIN yang sama.',
+  },
+  {
+    title: 'Persetujuan akun host',
+    body: 'Pemain tetap bebas tanpa akun. Akun host baru berstatus menunggu dan hanya bisa mengelola kuis setelah disetujui admin.',
+  },
+]
+
+const STEPS = [
+  {
+    title: 'Siapkan kuis',
+    body: 'Masuk sebagai host, buat kuis, lalu isi soal beserta jawabannya.',
+  },
+  {
+    title: 'Buka ruangan',
+    body: 'PIN 6 angka dan QR code muncul otomatis begitu ruangan dibuka.',
+  },
+  {
+    title: 'Pemain bergabung',
+    body: 'Scan QR atau buka situs ini, masukkan PIN, pilih nickname.',
+  },
+  {
+    title: 'Mainkan & nilai',
+    body: 'Host menekan mulai. Jawaban dinilai otomatis, juara diumumkan.',
   },
 ]
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-[#f6f5f1] text-slate-900">
+      {/* Strip penanda edisi */}
+      <div className="bg-[#0b1120] px-5 py-2.5 text-center">
+        <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-white/55">
+          {EDITION_NOTE}
+        </p>
+      </div>
+
       {/* Header */}
-      <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/85 backdrop-blur safe-top">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-          <Logo />
-          <div className="flex items-center gap-2">
-            <ButtonLink href="/host/dashboard" variant="ghost" size="sm">
+      <header className="sticky top-0 z-30 border-b border-slate-900/10 bg-[#f6f5f1]/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 sm:px-8">
+          <Link href="/">
+            <Logo />
+          </Link>
+
+          <nav className="hidden items-center gap-7 text-sm font-medium text-slate-600 md:flex">
+            <a href="#spesifikasi" className="transition hover:text-slate-900">
+              Fitur
+            </a>
+            <a href="#alur" className="transition hover:text-slate-900">
+              Alur
+            </a>
+            <Link
+              href="/host/dashboard/how-to"
+              className="transition hover:text-slate-900"
+            >
+              Panduan
+            </Link>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/host/dashboard"
+              className="hidden text-sm font-semibold text-slate-700 transition hover:text-slate-900 sm:block"
+            >
               Kuis saya
-            </ButtonLink>
-            <ButtonLink href="/host/dashboard" size="sm">
-              Buat kuis
+            </Link>
+            <ButtonLink href="/join" size="sm">
+              Gabung
             </ButtonLink>
           </div>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -left-32 -top-40 h-96 w-96 rounded-full bg-violet-200/50 blur-3xl"
-        />
-        <div
-          aria-hidden
-          className="pointer-events-none absolute -right-24 top-10 h-80 w-80 rounded-full bg-sky-200/40 blur-3xl"
-        />
-
-        <div className="relative mx-auto grid max-w-6xl gap-12 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.1fr_1fr] lg:gap-16 lg:pb-24 lg:pt-20">
+      <section className="relative border-b border-slate-900/10">
+        <div className="mx-auto grid max-w-6xl gap-14 px-5 py-14 sm:px-8 lg:grid-cols-[1.02fr_0.98fr] lg:gap-20 lg:py-20">
           <div>
-            <span className="inline-flex items-center gap-2 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-              <span className="h-1.5 w-1.5 rounded-full bg-violet-500" />
-              Gratis · Open source · Tanpa iklan
-            </span>
-            <h1 className="mt-5 font-display text-4xl font-extrabold leading-[1.05] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
-              Bikin kuis seru,
-              <br />
-              main bareng
-              <span className="bg-gradient-to-r from-violet-600 to-fuchsia-500 bg-clip-text text-transparent">
-                {' '}
-                seketika
-              </span>
-            </h1>
-            <p className="mt-5 max-w-xl text-base leading-relaxed text-slate-600 sm:text-lg">
-              Alternatif Kahoot untuk kelas, rapat, atau kumpul keluarga. Host
-              menampilkan soal, pemain menjawab dari HP masing-masing, skor
-              muncul realtime.
+            <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-violet-700">
+              Kuis live · kelas &amp; rapat
             </p>
 
-            <div className="mt-8 max-w-xl">
+            <h1 className="mt-6 font-display text-[2.7rem] font-extrabold leading-[0.97] tracking-[-0.035em] sm:text-6xl lg:text-[4.1rem]">
+              Bikin kuis,
+              <br />
+              bagikan PIN,
+              <br />
+              <span className="text-violet-600">lihat skornya</span>
+            </h1>
+
+            <p className="mt-7 max-w-lg text-base leading-relaxed text-slate-600">
+              Host menampilkan soal di layar besar, pemain menjawab dari HP
+              masing-masing. Tidak perlu instalasi, tidak perlu akun untuk
+              pemain, dan tidak ada batas jumlah soal.
+            </p>
+
+            <div className="mt-9 max-w-md">
               <JoinBox />
             </div>
 
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3 text-sm text-slate-500">
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                Tidak perlu install
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-sky-500" />
-                Jalan di HP &amp; laptop
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-amber-500" />
-                Data milik Anda sendiri
-              </span>
-            </div>
+            <dl className="mt-11 grid max-w-md grid-cols-3 border-t border-slate-900/10 pt-6">
+              {[
+                { value: '6', label: 'angka PIN' },
+                { value: '0', label: 'akun pemain' },
+                { value: '∞', label: 'jumlah soal' },
+              ].map((stat, index) => (
+                <div
+                  key={stat.label}
+                  className={index > 0 ? 'border-l border-slate-900/10 pl-5' : ''}
+                >
+                  <dt className="font-display text-3xl font-extrabold tracking-tight">
+                    {stat.value}
+                  </dt>
+                  <dd className="mt-1 text-xs leading-snug text-slate-500">
+                    {stat.label}
+                  </dd>
+                </div>
+              ))}
+            </dl>
           </div>
 
-          {/* Mock kartu soal */}
+          {/* Contoh soal — sengaja dipertahankan seperti semula */}
           <div className="lg:pt-6">
             <div className="relative mx-auto max-w-md">
               <div className="rotate-[-1.5deg] rounded-3xl border border-slate-200 bg-slate-900 p-5 shadow-2xl shadow-slate-900/20">
@@ -166,31 +202,33 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Fitur */}
-      <section className="border-t border-slate-200 bg-slate-50">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-          <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-            Semua yang dibutuhkan untuk kuis live
-          </h2>
-          <p className="mt-3 max-w-2xl text-slate-600">
-            Ringan, cepat, dan bisa di-deploy gratis ke Vercel atau Netlify
-            dengan database Supabase.
-          </p>
+      {/* Spesifikasi fitur */}
+      <section id="spesifikasi" className="border-b border-slate-900/10">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
+            <h2 className="max-w-lg font-display text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-[2.6rem]">
+              Semua yang dibutuhkan untuk satu sesi kuis
+            </h2>
+            <p className="max-w-sm text-sm leading-relaxed text-slate-600">
+              Ringan, cepat, dan bisa di-hosting gratis di Vercel atau Netlify
+              dengan database Supabase.
+            </p>
+          </div>
 
-          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
-            {FEATURES.map((feature) => (
+          <div className="mt-12 border-t border-slate-900/10">
+            {SPECS.map((spec, index) => (
               <div
-                key={feature.title}
-                className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+                key={spec.title}
+                className="group grid gap-2 border-b border-slate-900/10 py-7 sm:grid-cols-[3.5rem_15rem_1fr] sm:gap-8 sm:py-8"
               >
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                  {feature.icon}
-                </div>
-                <h3 className="mt-4 font-display text-base font-bold text-slate-900">
-                  {feature.title}
+                <span className="font-mono text-xs text-slate-400 transition group-hover:text-violet-600">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <h3 className="font-display text-lg font-bold tracking-tight">
+                  {spec.title}
                 </h3>
-                <p className="mt-2 text-sm leading-relaxed text-slate-600">
-                  {feature.body}
+                <p className="max-w-2xl text-sm leading-relaxed text-slate-600">
+                  {spec.body}
                 </p>
               </div>
             ))}
@@ -198,93 +236,123 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Cara pakai */}
-      <section className="bg-white">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:py-20">
-          <div className="grid gap-10 lg:grid-cols-2 lg:gap-16">
-            <div>
-              <h2 className="font-display text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">
-                Cara main
-              </h2>
-              <ol className="mt-6 space-y-5">
-                {[
-                  {
-                    title: 'Host membuat kuis',
-                    body: 'Masuk ke dashboard, buat kuis baru, isi soal dan jawaban benarnya.',
-                  },
-                  {
-                    title: 'Host membuka ruangan',
-                    body: 'Klik "Mainkan", PIN 6 angka dan QR code otomatis muncul di layar.',
-                  },
-                  {
-                    title: 'Pemain gabung dari HP',
-                    body: 'Scan QR atau buka situs ini, masukkan PIN dan pilih nickname.',
-                  },
-                  {
-                    title: 'Mulai dan lihat skornya',
-                    body: 'Host menekan Mulai. Jawaban dihitung, grafik tampil, juara diumumkan.',
-                  },
-                ].map((step, index) => (
-                  <li key={step.title} className="flex gap-4">
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-900 font-display text-sm font-bold text-white">
-                      {index + 1}
-                    </span>
-                    <div>
-                      <p className="font-semibold text-slate-900">
-                        {step.title}
-                      </p>
-                      <p className="mt-0.5 text-sm leading-relaxed text-slate-600">
-                        {step.body}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </div>
+      {/* Alur */}
+      <section id="alur" className="bg-[#0b1120] text-white">
+        <div className="mx-auto max-w-6xl px-5 py-16 sm:px-8 lg:py-20">
+          <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-violet-300">
+            Alur permainan
+          </p>
+          <h2 className="mt-5 max-w-xl font-display text-3xl font-extrabold leading-tight tracking-[-0.025em] sm:text-[2.6rem]">
+            Empat langkah, dari nol sampai podium
+          </h2>
 
-            <div className="rounded-3xl bg-gradient-to-br from-violet-600 to-fuchsia-600 p-8 text-white shadow-xl">
-              <h3 className="font-display text-xl font-extrabold">
-                Siap bikin kuis pertama?
-              </h3>
-              <p className="mt-2 text-sm leading-relaxed text-white/85">
-                Anda tidak perlu akun untuk memulai — cukup buat kuis dan
-                bagikan PIN-nya. Login email tersedia kalau ingin kuis Anda
-                tersimpan permanen.
-              </p>
-              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-                <ButtonLink
-                  href="/host/dashboard"
-                  size="lg"
-                  className="!bg-white !text-violet-700 shadow-lg hover:!bg-violet-50"
-                >
-                  Mulai buat kuis
-                </ButtonLink>
-                <ButtonLink
-                  href="/join"
-                  size="lg"
-                  variant="dark"
-                  className="!border-white/30"
-                >
-                  Gabung permainan
-                </ButtonLink>
-              </div>
-            </div>
+          <ol className="mt-14 grid gap-x-8 gap-y-10 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step, index) => (
+              <li key={step.title} className="border-t border-white/15 pt-6">
+                <span className="font-display text-4xl font-extrabold tracking-tight text-white/20">
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <h3 className="mt-4 font-display text-base font-bold tracking-tight">
+                  {step.title}
+                </h3>
+                <p className="mt-2 text-sm leading-relaxed text-white/60">
+                  {step.body}
+                </p>
+              </li>
+            ))}
+          </ol>
+
+          <div className="mt-14 flex flex-col gap-3 sm:flex-row">
+            <ButtonLink
+              href="/host/dashboard"
+              size="lg"
+              className="!bg-white !text-slate-900 shadow-lg hover:!bg-slate-100"
+            >
+              Mulai buat kuis
+            </ButtonLink>
+            <ButtonLink href="/join" size="lg" variant="dark">
+              Gabung permainan
+            </ButtonLink>
           </div>
         </div>
       </section>
 
-      <footer className="border-t border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 py-8 text-sm text-slate-500 sm:flex-row sm:px-6">
-          <Logo />
-          <p>
-            Dibuat dengan Next.js, Tailwind CSS, dan Supabase.{' '}
-            <Link
-              href="/host/dashboard/how-to"
-              className="font-semibold text-violet-600 hover:text-violet-700"
-            >
-              Panduan host
-            </Link>
-          </p>
+      {/* Kredit & footer */}
+      <footer>
+        <div className="mx-auto max-w-6xl px-5 py-14 sm:px-8 lg:py-16">
+          <div className="grid gap-10 lg:grid-cols-[0.9fr_1.1fr] lg:gap-16">
+            <div>
+              <Logo />
+              <p className="mt-5 max-w-sm text-sm leading-relaxed text-slate-600">
+                Versi yang disesuaikan untuk keperluan internal{' '}
+                <strong className="font-semibold text-slate-800">
+                  BSC Accounting 2026
+                </strong>
+                . Berjalan sepenuhnya di browser, data tersimpan di database
+                milik sendiri.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-900/10 bg-white p-6 sm:p-7">
+              <p className="font-mono text-[11px] uppercase tracking-[0.28em] text-slate-400">
+                Kredit
+              </p>
+
+              <p className="mt-4 text-sm leading-relaxed text-slate-700">
+                Dibangun dari proyek open source{' '}
+                <a
+                  href={REPO_URL}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  className="font-semibold text-violet-700 underline decoration-violet-300 underline-offset-4 transition hover:text-violet-800 hover:decoration-violet-500"
+                >
+                  supabase-community/kahoot-alternative
+                </a>{' '}
+                (lisensi MIT). Terima kasih kepada para pembuat aslinya atas
+                pondasi proyek ini.
+              </p>
+
+              <p className="mt-4 text-sm leading-relaxed text-slate-700">
+                Antarmuka, alur permainan, dan fitur di versi ini{' '}
+                <strong className="font-semibold text-slate-900">
+                  dikembangkan serta disesuaikan oleh addo
+                </strong>{' '}
+                untuk kebutuhan personal{' '}
+                <strong className="font-semibold text-slate-900">
+                  BSC Accounting 2026
+                </strong>{' '}
+                — termasuk PIN ruangan, mode soal jawaban diketik, penilaian di
+                sisi host, dan persetujuan akun host oleh admin.
+              </p>
+
+              <p className="mt-5 font-mono text-[11px] uppercase tracking-[0.14em] text-slate-400">
+                MIT License · Next.js · Tailwind CSS · Supabase
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-12 flex flex-col gap-3 border-t border-slate-900/10 pt-6 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              © 2026 BSC Accounting 2026 · diedit oleh{' '}
+              <strong className="font-semibold text-slate-700">addo</strong>
+            </span>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+              <Link
+                href="/host/dashboard/how-to"
+                className="font-semibold text-violet-700 transition hover:text-violet-800"
+              >
+                Panduan host →
+              </Link>
+              <a
+                href={REPO_URL}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="font-semibold text-slate-600 transition hover:text-slate-900"
+              >
+                Sumber asli ↗
+              </a>
+            </div>
+          </div>
         </div>
       </footer>
     </div>
