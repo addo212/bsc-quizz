@@ -9,6 +9,7 @@ import { createGame } from '@/lib/game'
 import { useHostAccess } from '@/lib/use-host-access'
 import {
   COVER_COLORS,
+  ANSWER_STYLES,
   DEFAULT_POINTS,
   DEFAULT_TIME_LIMIT,
   MAX_NAME_LENGTH,
@@ -18,7 +19,7 @@ import {
   QUESTION_TYPES,
 } from '@/constants'
 import { cn, downloadJson, slugify } from '@/lib/utils'
-import { AnswerShape } from '@/components/game-ui'
+import { AnswerShape, CheckIcon } from '@/components/game-ui'
 import {
   Alert,
   Button,
@@ -85,6 +86,7 @@ export default function QuizEditorPage({
   const [starting, setStarting] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [showSettings, setShowSettings] = useState(true)
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   const draftRef = useRef<Draft | null>(null)
   draftRef.current = draft
@@ -470,6 +472,13 @@ export default function QuizEditorPage({
                   ? 'Tersimpan'
                   : ''}
           </span>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setPreviewOpen(true)}
+          >
+            👁 Pratinjau
+          </Button>
           <Button variant="secondary" size="sm" onClick={handleExport}>
             Unduh JSON
           </Button>
@@ -695,6 +704,301 @@ export default function QuizEditorPage({
           </ul>
         </div>
       )}
+
+      {previewOpen && (
+        <QuizPreview
+          draft={draft}
+          startIndex={activeIndex}
+          onClose={() => setPreviewOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Pratinjau draft                                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Menampilkan draft kuis seperti yang akan dilihat pemain — dipakai untuk
+ * memeriksa soal & gambar sebelum disimpan atau dimainkan.
+ */
+function QuizPreview({
+  draft,
+  startIndex,
+  onClose,
+}: {
+  draft: Draft
+  startIndex: number
+  onClose: () => void
+}) {
+  const total = draft.questions.length
+  const [index, setIndex] = useState(
+    Math.min(Math.max(0, startIndex), Math.max(0, total - 1))
+  )
+
+  const go = useCallback(
+    (delta: number) => {
+      setIndex((current) => Math.min(Math.max(0, current + delta), total - 1))
+    },
+    [total]
+  )
+
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+      if (event.key === 'ArrowRight') go(1)
+      if (event.key === 'ArrowLeft') go(-1)
+    }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose, go])
+
+  useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [])
+
+  const question = draft.questions[index]
+  const isText = question?.question_type === 'text'
+
+  return (
+    <div className="fixed inset-0 z-[60] flex flex-col bg-slate-950">
+      {/* Bar atas */}
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
+        <div className="flex items-center gap-3">
+          <span className="rounded-lg bg-violet-500/15 px-2.5 py-1 font-mono text-[10px] uppercase tracking-[0.2em] text-violet-300">
+            Pratinjau
+          </span>
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold text-white">
+              {draft.name || 'Kuis Tanpa Judul'}
+            </p>
+            <p className="text-xs text-white/45">
+              {total > 0
+                ? `Soal ${index + 1} dari ${total}`
+                : 'Belum ada soal'}
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => go(-1)}
+            disabled={index <= 0}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-30"
+          >
+            ←
+          </button>
+          <button
+            type="button"
+            onClick={() => go(1)}
+            disabled={index >= total - 1}
+            className="rounded-lg border border-white/15 px-3 py-1.5 text-sm font-semibold text-white/80 transition hover:bg-white/10 disabled:opacity-30"
+          >
+            →
+          </button>
+          <Button size="sm" variant="dark" onClick={onClose}>
+            Tutup
+          </Button>
+        </div>
+      </header>
+
+      {/* Isi */}
+      <div className="flex-1 overflow-y-auto thin-scrollbar px-4 py-6 sm:px-6 sm:py-10">
+        {total === 0 ? (
+          <div className="mx-auto max-w-md rounded-3xl border border-dashed border-white/15 bg-white/[0.03] px-6 py-16 text-center">
+            <p className="font-display text-lg font-extrabold text-white">
+              Belum ada soal untuk ditampilkan
+            </p>
+            <p className="mt-2 text-sm text-white/50">
+              Tambahkan soal terlebih dahulu, lalu buka pratinjau lagi.
+            </p>
+          </div>
+        ) : (
+          <div className="mx-auto max-w-3xl">
+            {question.image_url && (
+              <div className="mb-5">
+                <QuestionImagePreview url={question.image_url} tone="dark" />
+              </div>
+            )}
+
+            <h2 className="rounded-3xl bg-white px-6 py-7 text-center font-display text-xl font-extrabold leading-snug text-slate-900 shadow-2xl sm:px-10 sm:py-9 sm:text-3xl">
+              {question.body.trim() || `Soal ${index + 1} (belum diisi)`}
+            </h2>
+
+            {isText ? (
+              <div className="mt-8 space-y-3">
+                <div className="rounded-2xl border border-white/15 bg-white/5 px-5 py-4 text-center text-white/40">
+                  <p className="font-display text-lg font-bold">
+                    Pemain mengetik jawaban…
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-4 text-center">
+                  <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-300/70">
+                    Kunci jawaban
+                  </p>
+                  <p className="mt-1 font-display text-xl font-extrabold text-white">
+                    {question.text_answer?.trim() || '— belum diisi —'}
+                  </p>
+                  {question.text_exact && (
+                    <p className="mt-1 text-[11px] text-white/40">
+                      Wajib sama persis (peka huruf besar/kecil)
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 grid gap-3 sm:grid-cols-2">
+                {question.choices.length === 0 && (
+                  <p className="sm:col-span-2 rounded-2xl border border-dashed border-white/15 px-5 py-8 text-center text-sm text-white/45">
+                    Belum ada pilihan jawaban.
+                  </p>
+                )}
+                {question.choices.map((choice, choiceIndex) => {
+                  const style = ANSWER_STYLES[choiceIndex % ANSWER_STYLES.length]
+                  return (
+                    <div
+                      key={choice.id}
+                      className={cn(
+                        'relative flex items-center gap-3 rounded-2xl px-4 py-5 text-white shadow-lg sm:px-5 sm:py-6',
+                        style.bg,
+                        choice.is_correct && 'ring-4 ring-white/80'
+                      )}
+                    >
+                      <AnswerShape
+                        index={choiceIndex}
+                        className="h-5 w-5 shrink-0"
+                      />
+                      <span className="flex-1 font-display text-base font-bold leading-snug sm:text-lg">
+                        {choice.body.trim() || `Pilihan ${choiceIndex + 1}`}
+                      </span>
+                      {choice.is_correct && <CheckIcon className="h-5 w-5" />}
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Meta soal */}
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-2 text-xs">
+              <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white/70">
+                ⏱ {question.time_limit} detik
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white/70">
+                {question.points > 0
+                  ? `${question.points} poin`
+                  : 'tanpa poin'}
+              </span>
+              <span className="rounded-full bg-white/10 px-3 py-1.5 font-semibold text-white/70">
+                {isText ? 'jawaban diketik' : 'pilihan ganda'}
+              </span>
+            </div>
+
+            {/* Navigasi nomor soal */}
+            {total > 1 && (
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-2">
+                {draft.questions.map((item, itemIndex) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setIndex(itemIndex)}
+                    className={cn(
+                      'h-8 w-8 rounded-lg text-xs font-bold transition',
+                      itemIndex === index
+                        ? 'bg-white text-slate-900'
+                        : 'bg-white/10 text-white/60 hover:bg-white/20'
+                    )}
+                  >
+                    {itemIndex + 1}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Bar bawah */}
+      <footer className="safe-bottom border-t border-white/10 px-4 py-3 sm:px-6">
+        <div className="mx-auto flex max-w-3xl items-center justify-between gap-3">
+          <p className="text-xs text-white/40">
+            Tekan ← → untuk berpindah soal, Esc untuk menutup
+          </p>
+          <Button variant="dark" size="sm" onClick={onClose}>
+            Selesai
+          </Button>
+        </div>
+      </footer>
+    </div>
+  )
+}
+
+/**
+ * Pratinjau gambar soal. Berguna untuk memastikan tautan gambarnya benar
+ * sebelum kuis dimainkan — bukan saat permainan sudah berjalan.
+ */
+function QuestionImagePreview({
+  url,
+  tone = 'light',
+}: {
+  url: string
+  tone?: 'light' | 'dark'
+}) {
+  const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+
+  useEffect(() => {
+    setStatus('loading')
+  }, [url])
+
+  return (
+    <div
+      className={cn(
+        'overflow-hidden rounded-2xl border',
+        tone === 'dark'
+          ? 'border-white/15 bg-white/5'
+          : 'border-slate-200 bg-slate-50'
+      )}
+    >
+      {status === 'loading' && (
+        <div
+          className={cn(
+            'flex items-center justify-center gap-2 px-4 py-8 text-xs font-medium',
+            tone === 'dark' ? 'text-white/50' : 'text-slate-500'
+          )}
+        >
+          <Spinner className="h-4 w-4" />
+          Memuat gambar…
+        </div>
+      )}
+
+      {status === 'error' && (
+        <div
+          className={cn(
+            'px-4 py-6 text-center text-xs leading-relaxed',
+            tone === 'dark' ? 'text-rose-300' : 'text-rose-600'
+          )}
+        >
+          Gambar tidak bisa dimuat. Pastikan tautannya langsung menuju berkas
+          gambar (mis. berakhiran .jpg / .png) dan bisa diakses publik.
+        </div>
+      )}
+
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt="Pratinjau gambar soal"
+        onLoad={() => setStatus('ok')}
+        onError={() => setStatus('error')}
+        className={cn(
+          'mx-auto max-h-56 w-auto object-contain sm:max-h-72',
+          status === 'ok' ? 'block' : 'hidden'
+        )}
+      />
     </div>
   )
 }
@@ -814,6 +1118,10 @@ function QuestionEditor({
             placeholder="https://contoh.com/gambar.jpg"
           />
         </Field>
+
+        {question.image_url?.trim() ? (
+          <QuestionImagePreview url={question.image_url.trim()} />
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Waktu menjawab">
