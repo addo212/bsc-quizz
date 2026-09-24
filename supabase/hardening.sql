@@ -45,6 +45,10 @@ as $$
                 'points',   q.points,
                 'question_type', coalesce(q.question_type, 'choice'),
                 'text_exact',    coalesce(q.text_exact, false),
+                -- Kategori kata (dipakai mode tebak kata). Dibaca lewat
+                -- to_jsonb supaya skrip ini tetap bisa dijalankan walaupun
+                -- supabase/charades.sql belum dipasang.
+                'category', to_jsonb(q) ->> 'category',
                 -- kunci jawaban hanya dikirim saat jawaban sudah di-reveal
                 'text_answer',
                     case

@@ -71,6 +71,7 @@ export type GameQuestion = {
   question_type: QuestionType
   text_exact: boolean
   text_answer: string | null
+  category?: string | null
   choices: {
     id: string
     body: string

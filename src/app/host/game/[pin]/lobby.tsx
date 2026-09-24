@@ -1,19 +1,29 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQRCode } from 'next-qrcode'
 import { Participant } from '@/types/types'
 import { Avatar } from '@/components/player-chip'
 import { Button } from '@/components/ui'
 import { joinUrl } from '@/lib/site'
-import { DEFAULT_ROUND_TIME, ROUND_TIME_OPTIONS } from '@/constants'
-import { splitQuestionsForTeams } from '@/lib/game'
+import {
+  CHARADE_DIVISIONS,
+  DEFAULT_ROUND_TIME,
+  ROUND_TIME_OPTIONS,
+  CharadeDivision,
+} from '@/constants'
+import {
+  CharadeWord,
+  buildCharadeBuckets,
+  categoryOf,
+  summarizeTeamCategories,
+} from '@/lib/game'
 import { cn } from '@/lib/utils'
 
 export function HostLobby({
   pin,
   quizName,
-  totalQuestions,
+  words,
   players,
   starting,
   charades = false,
@@ -21,18 +31,39 @@ export function HostLobby({
 }: {
   pin: string
   quizName: string
-  totalQuestions: number
+  /** Daftar soal/kuis lengkap — dipakai untuk menghitung pembagian kata. */
+  words: CharadeWord[]
   players: Participant[]
   starting: boolean
-  /** true = mode tebak kata: 1 HP per tim + soal dibagi rata. */
+  /** true = mode tebak kata: 1 HP per tim + kata dibagi rata. */
   charades?: boolean
-  onStart: (roundTimeLimit: number) => void
+  onStart: (options: { roundTimeLimit: number; division: CharadeDivision }) => void
 }) {
   const { Canvas } = useQRCode()
   const url = joinUrl(pin)
   const [roundTime, setRoundTime] = useState(DEFAULT_ROUND_TIME)
 
-  const slices = splitQuestionsForTeams(totalQuestions, players.length)
+  const totalQuestions = words.length
+
+  /** Nama kategori yang dipakai di kuis ini (urut kemunculan pertama). */
+  const categories = useMemo(
+    () => Array.from(new Set(words.map((word) => categoryOf(word)))),
+    [words]
+  )
+  const hasCategories = categories.length > 1
+  const [division, setDivision] = useState<CharadeDivision>(
+    hasCategories ? 'category-mix' : 'sequence'
+  )
+
+  const buckets = useMemo(
+    () => (charades ? buildCharadeBuckets(words, players.length, division) : []),
+    [charades, words, players.length, division]
+  )
+  const composition = useMemo(
+    () => summarizeTeamCategories(words, buckets),
+    [words, buckets]
+  )
+  const sampleComposition = composition[0] ?? []
   const teamsTooMany = charades && players.length > totalQuestions
 
   return (
@@ -114,13 +145,66 @@ export function HostLobby({
                 ))}
               </div>
 
+              {hasCategories && (
+                <>
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-white/40">
+                    Cara bagi kata
+                  </p>
+                  <div className="mt-2 space-y-1.5">
+                    {CHARADE_DIVISIONS.map((option) => (
+                      <button
+                        key={option.id}
+                        type="button"
+                        onClick={() => setDivision(option.id)}
+                        className={cn(
+                          'w-full rounded-xl border px-3 py-2 text-left transition',
+                          division === option.id
+                            ? 'border-violet-400/60 bg-violet-500/20'
+                            : 'border-white/10 bg-white/5 hover:bg-white/10'
+                        )}
+                      >
+                        <span className="block text-xs font-bold text-white">
+                          {option.label}
+                        </span>
+                        <span className="mt-0.5 block text-[11px] leading-relaxed text-white/50">
+                          {option.hint}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wider text-white/40">
+                    Kategori terdeteksi
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {categories.map((category) => (
+                      <span
+                        key={category}
+                        className="rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-white/75"
+                      >
+                        {category}
+                      </span>
+                    ))}
+                  </div>
+                </>
+              )}
+
               <p className="mt-3 text-xs leading-relaxed text-white/50">
                 {players.length === 0
-                  ? 'Setiap tim akan mendapat potongan kata sendiri, jadi tidak ada kata yang sama.'
+                  ? 'Setiap tim akan mendapat daftar katanya sendiri, jadi tidak ada kata yang sama.'
                   : teamsTooMany
-                    ? `Soal (${totalQuestions}) lebih sedikit dari tim (${players.length}). Tambah soal dulu.`
-                    : `${players.length} tim → ${slices.map((slice) => slice.count).join(' · ')} kata per tim (tanpa tumpang tindih).`}
+                    ? `Kata (${totalQuestions}) lebih sedikit dari tim (${players.length}). Tambah kata dulu.`
+                    : `${players.length} tim → ${buckets.map((bucket) => bucket.length).join(' · ')} kata per tim (tanpa tumpang tindih).`}
               </p>
+
+              {players.length > 0 && !teamsTooMany && sampleComposition.length > 0 && (
+                <p className="mt-1 text-[11px] leading-relaxed text-violet-300/80">
+                  Komposisi tim pertama:{' '}
+                  {sampleComposition
+                    .map((item) => `${item.count} ${item.category}`)
+                    .join(' · ')}
+                </p>
+              )}
             </div>
           )}
 
@@ -128,7 +212,9 @@ export function HostLobby({
             size="xl"
             block
             className="mt-6"
-            onClick={() => onStart(roundTime)}
+            onClick={() =>
+              onStart({ roundTimeLimit: roundTime, division })
+            }
             loading={starting}
             disabled={
               players.length === 0 || totalQuestions === 0 || teamsTooMany
@@ -186,12 +272,12 @@ export function HostLobby({
                     <span
                       className="shrink-0 rounded-lg bg-white/10 px-2 py-0.5 text-[10px] font-bold text-white/70"
                       title={
-                        slices[index]
-                          ? `${slices[index].count} kata`
-                          : undefined
+                        composition[index]
+                          ?.map((item) => `${item.count} ${item.category}`)
+                          .join(' · ') || undefined
                       }
                     >
-                      {slices[index]?.count ?? 0} kata
+                      {buckets[index]?.length ?? 0} kata
                     </span>
                   )}
                 </div>

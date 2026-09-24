@@ -13,6 +13,7 @@ import {
   DEFAULT_POINTS,
   DEFAULT_TIME_LIMIT,
   GAME_MODES,
+  MAX_CATEGORY_LENGTH,
   MAX_NAME_LENGTH,
   MAX_TEXT_ANSWER_LENGTH,
   MAX_TIME_LIMIT,
@@ -73,6 +74,7 @@ function emptyQuestion(order: number, charades = false): Question {
     question_type: 'choice',
     text_answer: null,
     text_exact: false,
+    category: null,
     choices: charades ? [] : [emptyChoice(), emptyChoice()],
   }
 }
@@ -172,6 +174,19 @@ export default function QuizEditorPage({
     return list
   }, [draft])
 
+  /** Kategori yang sudah dipakai di kuis ini — jadi saran saat mengisi yang baru. */
+  const categoryOptions = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          (draft?.questions ?? [])
+            .map((question) => question.category?.trim() ?? '')
+            .filter((category) => category.length > 0)
+        )
+      ),
+    [draft]
+  )
+
   /* --------------------------------- Simpan -------------------------------- */
   const save = useCallback(
     async (options?: { silent?: boolean }) => {
@@ -199,6 +214,7 @@ export default function QuizEditorPage({
                   choices: [],
                 }))
               : current.questions,
+          charades: current.game_mode === 'charades',
         })
         setDirty(false)
         setSavedAt(Date.now())
@@ -383,8 +399,10 @@ export default function QuizEditorPage({
     downloadJson(`quiz-${slugify(current.name)}.json`, {
       name: current.name,
       description: current.description,
+      game_mode: current.game_mode,
       questions: current.questions.map((question) => ({
         body: question.body,
+        category: question.category,
         image_url: question.image_url,
         time_limit: question.time_limit,
         points: question.points,
@@ -432,6 +450,10 @@ export default function QuizEditorPage({
           question_type: isText ? ('text' as const) : ('choice' as const),
           text_answer: isText ? textAnswer : null,
           text_exact: Boolean(raw.text_exact),
+          category:
+            typeof raw.category === 'string' && raw.category.trim()
+              ? raw.category.trim()
+              : null,
           choices: isText
             ? []
             : (Array.isArray(raw.choices) ? raw.choices : []).map(
@@ -449,6 +471,11 @@ export default function QuizEditorPage({
       mutate((current) => ({
         ...current,
         name: current.name || parsed.name || 'Kuis Impor',
+        // File impor boleh menentukan mode kuis (mis. hasil ekspor kuis tebak kata).
+        game_mode:
+          parsed.game_mode === 'charades' || parsed.game_mode === 'classic'
+            ? parsed.game_mode
+            : current.game_mode,
         questions,
       }))
       setActiveIndex(0)
@@ -725,6 +752,7 @@ export default function QuizEditorPage({
           index={activeIndex}
           total={draft.questions.length}
           charades={draft.game_mode === 'charades'}
+          categoryOptions={categoryOptions}
           onUpdate={(patch) => updateQuestion(activeIndex, patch)}
           onUpdateChoice={(choiceIndex, patch) =>
             updateChoice(activeIndex, choiceIndex, patch)
@@ -918,6 +946,14 @@ function QuizPreview({
               {question.body.trim() || `Soal ${index + 1} (belum diisi)`}
             </h2>
 
+            {question.category?.trim() && (
+              <p className="mt-3 text-center">
+                <span className="rounded-full bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wider text-white/70">
+                  {question.category.trim()}
+                </span>
+              </p>
+            )}
+
             {isText ? (
               <div className="mt-8 space-y-3">
                 <div className="rounded-2xl border border-white/15 bg-white/5 px-5 py-4 text-center text-white/40">
@@ -1097,6 +1133,7 @@ function QuestionEditor({
   index,
   total,
   charades,
+  categoryOptions,
   onUpdate,
   onUpdateChoice,
   onSetCorrect,
@@ -1111,6 +1148,8 @@ function QuestionEditor({
   total: number
   /** true = mode tebak kata: kata kunci + gambar, tanpa pilihan jawaban. */
   charades: boolean
+  /** Kategori yang sudah dipakai di kuis ini, untuk saran isian otomatis. */
+  categoryOptions: string[]
   onUpdate: (patch: Partial<Question>) => void
   onUpdateChoice: (choiceIndex: number, patch: Partial<Choice>) => void
   onSetCorrect: (choiceIndex: number) => void
@@ -1179,6 +1218,28 @@ function QuestionEditor({
             className="font-medium"
           />
         </Field>
+
+        {charades && (
+          <Field
+            label="Kategori (opsional)"
+            hint="Dipakai untuk pembagian campur rata antar tim, dan tampil sebagai tema di layar pemeraga."
+          >
+            <Input
+              value={question.category ?? ''}
+              maxLength={MAX_CATEGORY_LENGTH}
+              list="quiz-categories"
+              onChange={(event) =>
+                onUpdate({ category: event.target.value || null })
+              }
+              placeholder="Contoh: Hewan"
+            />
+            <datalist id="quiz-categories">
+              {categoryOptions.map((category) => (
+                <option key={category} value={category} />
+              ))}
+            </datalist>
+          </Field>
+        )}
 
         {!charades && (
           <Field label="Tipe soal">

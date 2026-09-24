@@ -135,12 +135,17 @@ export async function duplicateQuizSet(quizId: string): Promise<QuizSet> {
 export async function saveQuiz({
   quizId,
   questions,
+  charades = false,
 }: {
   quizId: string
   questions: Question[]
+  /** true kalau kuis ini mode tebak kata (kategori selalu ikut disimpan). */
+  charades?: boolean
 }) {
   const payloadQuestions = questions.map((question, index) => {
     const isText = question.question_type === 'text'
+    const category = question.category?.trim() || null
+
     return {
       id: question.id || crypto.randomUUID(),
       quiz_set_id: quizId,
@@ -153,6 +158,9 @@ export async function saveQuiz({
       // Kunci jawaban hanya relevan untuk soal bertipe teks.
       text_answer: isText ? question.text_answer?.trim() || null : null,
       text_exact: isText ? Boolean(question.text_exact) : false,
+      // Kolom `category` baru ada setelah supabase/charades.sql dijalankan,
+      // jadi kuis klasik tanpa kategori tidak menulisinya sama sekali.
+      ...(charades || category ? { category } : {}),
     }
   })
 

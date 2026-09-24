@@ -71,6 +71,31 @@ export const DEFAULT_ROUND_TIME = 60
 export const MIN_ROUND_TIME = 10
 export const MAX_ROUND_TIME = 300
 
+/** Nama kategori untuk kata yang tidak diberi kategori. */
+export const DEFAULT_CATEGORY_LABEL = 'Tanpa kategori'
+
+/** Batas panjang nama kategori */
+export const MAX_CATEGORY_LENGTH = 30
+
+/**
+ * Cara membagi kata antar tim di mode Tebak Kata.
+ * Semua pilihan tetap menjamin tidak ada kata yang dipakai dua tim.
+ */
+export const CHARADE_DIVISIONS = [
+  {
+    id: 'category-mix',
+    label: 'Campur rata per kategori',
+    hint: 'Tiap tim dapat campuran seimbang dari semua kategori, mis. 2 Hewan + 2 Benda + 1 Perbuatan.',
+  },
+  {
+    id: 'sequence',
+    label: 'Berurutan',
+    hint: 'Kata dibagi rata mengikuti urutan di editor, tanpa memperhatikan kategori.',
+  },
+] as const
+
+export type CharadeDivision = (typeof CHARADE_DIVISIONS)[number]['id']
+
 /** Opsi tema warna cover quiz */
 export const COVER_COLORS = [
   { id: 'violet', label: 'Violet', from: '#7c3aed', to: '#c026d3' },

@@ -118,6 +118,7 @@ export interface Database {
           question_type: QuestionType
           text_answer: string | null
           text_exact: boolean
+          category: string | null
         }
         Insert: {
           id?: string
@@ -131,6 +132,7 @@ export interface Database {
           question_type?: QuestionType
           text_answer?: string | null
           text_exact?: boolean
+          category?: string | null
         }
         Update: {
           id?: string
@@ -144,6 +146,7 @@ export interface Database {
           question_type?: QuestionType
           text_answer?: string | null
           text_exact?: boolean
+          category?: string | null
         }
         Relationships: []
       }
@@ -224,8 +227,8 @@ export interface Database {
           game_id: string
           user_id: string
           team_index: number | null
-          question_start: number | null
-          question_count: number | null
+          /** Daftar soal yang menjadi giliran tim ini (mode tebak kata). */
+          question_ids: string[]
         }
         Insert: {
           id?: string
@@ -234,8 +237,7 @@ export interface Database {
           game_id: string
           user_id?: string
           team_index?: number | null
-          question_start?: number | null
-          question_count?: number | null
+          question_ids?: string[]
         }
         Update: {
           id?: string
@@ -244,8 +246,7 @@ export interface Database {
           game_id?: string
           user_id?: string
           team_index?: number | null
-          question_start?: number | null
-          question_count?: number | null
+          question_ids?: string[]
         }
         Relationships: []
       }

@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Answer, Game, Participant } from '@/types/types'
 import { CHARADE_POINT } from '@/constants'
+import { CharadeWord, summarizeCategories } from '@/lib/game'
 import { Button, Logo } from '@/components/ui'
 import { cn } from '@/lib/utils'
 
@@ -18,6 +19,7 @@ export function HostCharades({
   quizName,
   game,
   players,
+  words,
   answers,
   busy,
   onNextRound,
@@ -28,6 +30,8 @@ export function HostCharades({
   quizName: string
   game: Game
   players: Participant[]
+  /** Semua kata kuis — dipakai untuk menampilkan komposisi kategori tiap tim. */
+  words: CharadeWord[]
   answers: Answer[]
   busy: boolean
   onNextRound: () => void
@@ -51,18 +55,29 @@ export function HostCharades({
   const expired = remainingMs <= 0
 
   /** Rekap tiap tim: berapa kata dijawab, berapa yang benar. */
-  const board = players.map((player) => {
-    const mine = answers.filter((answer) => answer.participant_id === player.id)
-    const correct = mine.filter((answer) => answer.score > 0).length
-    const total = player.question_count ?? 0
-    return {
-      player,
-      correct,
-      played: mine.length,
-      total,
-      exhausted: total > 0 && mine.length >= total,
-    }
-  })
+  const board = useMemo(
+    () =>
+      players.map((player) => {
+        const ids = player.question_ids ?? []
+        const assigned = new Set(ids)
+        const mine = answers.filter(
+          (answer) =>
+            answer.participant_id === player.id &&
+            assigned.has(answer.question_id)
+        )
+        const correct = mine.filter((answer) => answer.score > 0).length
+
+        return {
+          player,
+          correct,
+          played: mine.length,
+          total: ids.length,
+          composition: summarizeCategories(words, ids),
+          exhausted: ids.length > 0 && mine.length >= ids.length,
+        }
+      }),
+    [players, answers, words]
+  )
 
   const ranking = board
     .slice()
@@ -219,6 +234,13 @@ export function HostCharades({
                           Tim #{(entry.player.team_index ?? 0) + 1} ·{' '}
                           {entry.total} kata
                         </p>
+                        {entry.composition.length > 1 && (
+                          <p className="mt-1 text-[11px] leading-relaxed text-white/35">
+                            {entry.composition
+                              .map((item) => `${item.count} ${item.category}`)
+                              .join(' · ')}
+                          </p>
+                        )}
                       </div>
                       <span
                         className={cn(

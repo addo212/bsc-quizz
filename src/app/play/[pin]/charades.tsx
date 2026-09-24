@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Answer, Game, Participant, Question } from '@/types/types'
 import { CHARADE_POINT } from '@/constants'
 import { Button, Logo } from '@/components/ui'
@@ -39,9 +39,22 @@ export function PlayerCharades({
     return () => window.clearInterval(interval)
   }, [])
 
-  const start = participant.question_start ?? 0
-  const count = participant.question_count ?? questions.length
-  const slice = questions.slice(start, start + count)
+  const byId = useMemo(
+    () => new Map(questions.map((question) => [question.id, question])),
+    [questions]
+  )
+
+  /**
+   * Daftar kata milik tim ini, sesuai urutan yang ditulis host saat membagi.
+   * Kosong berarti pembagian belum jalan (host belum menekan "Bagi soal").
+   */
+  const slice = useMemo(
+    () =>
+      (participant.question_ids ?? [])
+        .map((id) => byId.get(id))
+        .filter((question): question is Question => Boolean(question)),
+    [participant.question_ids, byId]
+  )
 
   const played = slice.filter((question) => answers[question.id]).length
   const current = slice.find((question) => !answers[question.id]) ?? null
@@ -63,9 +76,11 @@ export function PlayerCharades({
   const remainingMs =
     startedAt === null ? limitMs : Math.max(0, limitMs - (now - startedAt))
   const expired = remainingMs <= 0
-  const finished = current === null
+  const count = slice.length
+  const waiting = count === 0
+  const finished = !waiting && current === null
 
-  const locked = expired || finished || submitting
+  const locked = expired || waiting || finished || submitting
 
   return (
     <div className="flex min-h-screen flex-col bg-slate-950">
@@ -119,22 +134,33 @@ export function PlayerCharades({
 
       {/* Isi */}
       <div className="flex flex-1 flex-col px-4 py-5">
-        {finished ? (
+        {waiting ? (
           <div className="flex flex-1 flex-col items-center justify-center text-center">
-            <div className="text-5xl">🎉</div>
-            <h2 className="mt-4 font-display text-2xl font-extrabold text-white">
-              Semua katamu sudah dimainkan
+            <div className="flex gap-2">
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-300ms]" />
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-violet-400 [animation-delay:-150ms]" />
+              <span className="h-2.5 w-2.5 animate-bounce rounded-full bg-violet-400" />
+            </div>
+            <h2 className="mt-5 font-display text-xl font-extrabold text-white">
+              Menunggu host membagi kata…
             </h2>
-            <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/55">
-              Tim kamu menebak <b className="text-emerald-300">{correct}</b> dari{' '}
-              {count} kata. Tunggu host membuka babak berikutnya.
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/50">
+              Kata untuk tim kamu sedang dibagikan. Layar ini akan otomatis
+              berganti.
             </p>
           </div>
-        ) : (
+        ) : current ? (
           <>
-            <p className="text-center text-[11px] font-semibold uppercase tracking-wider text-amber-300/80">
-              ⚠️ Jangan tunjukkan layar ini ke penebak
-            </p>
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-amber-300/80">
+                ⚠️ Jangan tunjukkan layar ini ke penebak
+              </p>
+              {current.category?.trim() && (
+                <span className="shrink-0 rounded-lg bg-violet-500/20 px-2 py-1 text-[11px] font-bold uppercase tracking-wider text-violet-200">
+                  {current.category.trim()}
+                </span>
+              )}
+            </div>
 
             {current.image_url && (
               // eslint-disable-next-line @next/next/no-img-element
@@ -157,12 +183,27 @@ export function PlayerCharades({
               </p>
             )}
           </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="text-5xl">🎉</div>
+            <h2 className="mt-4 font-display text-2xl font-extrabold text-white">
+              Semua katamu sudah dimainkan
+            </h2>
+            <p className="mt-2 max-w-xs text-sm leading-relaxed text-white/55">
+              Tim kamu menebak <b className="text-emerald-300">{correct}</b> dari{' '}
+              {count} kata. Tunggu host membuka babak berikutnya.
+            </p>
+          </div>
         )}
       </div>
 
       {/* Tombol penilaian */}
       <div className="safe-bottom px-4 pb-5">
-        {finished ? (
+        {waiting ? (
+          <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/45">
+            Tombol Benar/Lewati muncul begitu kata dibagikan.
+          </div>
+        ) : finished ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/50">
             Skor tim: {formatNumber(totalScore)} kata benar
             <span className="block text-xs text-white/35">

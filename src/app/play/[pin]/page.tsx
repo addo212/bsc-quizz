@@ -260,20 +260,23 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
       try {
         const fresh = await findMyParticipant(targetGameId, userId)
         if (!alive || !fresh) return
-        setParticipant((current) =>
-          current &&
-          current.team_index === fresh.team_index &&
-          current.question_start === fresh.question_start &&
-          current.question_count === fresh.question_count
+        setParticipant((current) => {
+          if (!current) return fresh
+          const before = current.question_ids ?? []
+          const after = fresh.question_ids ?? []
+          const sameList =
+            before.length === after.length &&
+            before.every((id, index) => id === after[index])
+          return current.team_index === fresh.team_index && sameList
             ? current
             : fresh
-        )
+        })
       } catch {
         /* abaikan, coba lagi di interval berikutnya */
       }
     }
 
-    const interval = window.setInterval(load, 4000)
+    const interval = window.setInterval(load, 2500)
 
     return () => {
       alive = false

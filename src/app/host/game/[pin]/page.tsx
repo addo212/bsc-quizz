@@ -34,6 +34,7 @@ import {
 import { getQuizSet } from '@/lib/quiz'
 import { useSession } from '@/lib/use-session'
 import { isTextAnswerCorrect, scoreForAnswer } from '@/lib/utils'
+import { CharadeDivision } from '@/constants'
 import { Alert, ButtonLink, Logo, Spinner } from '@/components/ui'
 
 export default function HostGamePage({ params }: { params: { pin: string } }) {
@@ -355,7 +356,13 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
    * Mode klasik: mulai dari soal pertama.
    * Mode tebak kata: bagi soal rata ke semua tim lalu buka babak pertama.
    */
-  const handleStart = async (roundTimeLimit: number) => {
+  const handleStart = async ({
+    roundTimeLimit,
+    division,
+  }: {
+    roundTimeLimit: number
+    division: CharadeDivision
+  }) => {
     const current = gameRef.current
     const loadedQuiz = quizRef.current
     if (!current || !loadedQuiz) return
@@ -364,8 +371,9 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       if (current.mode === 'charades') {
         await startCharadesGame({
           gameId: current.id,
-          totalQuestions: loadedQuiz.questions.length,
+          words: loadedQuiz.questions,
           roundTimeLimit,
+          division,
         })
         setGame({
           ...current,
@@ -537,7 +545,7 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       <HostLobby
         pin={pin}
         quizName={quiz.name}
-        totalQuestions={quiz.questions.length}
+        words={quiz.questions}
         players={players}
         starting={busy}
         charades={isCharades}
@@ -567,6 +575,7 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
         quizName={quiz.name}
         game={game}
         players={players}
+        words={quiz.questions}
         answers={charadeAnswers}
         busy={busy}
         onNextRound={handleNextCharadeRound}

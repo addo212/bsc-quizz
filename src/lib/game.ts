@@ -1,5 +1,5 @@
 import { supabase, Answer, Game, GameMode, GameQuestion, GameResult, Participant, Question } from '@/types/types'
-import { CHARADE_POINT } from '@/constants'
+import { CHARADE_POINT, DEFAULT_CATEGORY_LABEL, CharadeDivision } from '@/constants'
 import { randomPin } from './utils'
 
 /* -------------------------------------------------------------------------- */
@@ -368,6 +368,7 @@ export async function fetchGameQuestions(
       question_type: question.question_type ?? 'choice',
       text_answer: question.text_answer ?? null,
       text_exact: question.text_exact ?? false,
+      category: question.category ?? null,
       choices: (question.choices ?? []).map((choice) => ({
         id: choice.id,
         created_at: '',
@@ -404,62 +405,150 @@ export async function fetchGameQuestions(
 /* -------------------------------------------------------------------------- */
 
 /**
- * Bagi soal rata ke sejumlah tim tanpa tumpang tindih.
- *
- * Sisa pembagian diberikan ke tim urutan awal, jadi totalnya selalu utuh:
- * 15 soal / 4 tim => 4, 4, 4, 3.
+ * Soal minimal yang dibutuhkan untuk membagi giliran tiap tim.
+ * `category` dipakai kalau pembagiannya dicampur per kategori.
  */
-export function splitQuestionsForTeams(totalQuestions: number, teamCount: number) {
-  if (teamCount <= 0) return [] as { start: number; count: number }[]
+export type CharadeWord = { id: string; category?: string | null }
 
-  const base = Math.floor(totalQuestions / teamCount)
-  const remainder = totalQuestions % teamCount
-  const slices: { start: number; count: number }[] = []
-
-  let offset = 0
-  for (let index = 0; index < teamCount; index += 1) {
-    const count = base + (index < remainder ? 1 : 0)
-    slices.push({ start: offset, count })
-    offset += count
-  }
-
-  return slices
+/** Nama kategori sebuah kata, dengan label bawaan kalau kosong. */
+export function categoryOf(word: { category?: string | null }) {
+  return word.category?.trim() || DEFAULT_CATEGORY_LABEL
 }
 
 /**
- * Bagikan potongan soal ke tiap tim lalu mulai babak pertama.
+ * Bagi kata rata BERURUTAN: tim ke-i mendapat potongan berurutan dari daftar.
+ *
+ * Sisa pembagian diberikan ke tim urutan awal, jadi totalnya selalu utuh:
+ * 15 kata / 4 tim => 4, 4, 4, 3.
+ */
+export function splitQuestionsSequentially(
+  words: CharadeWord[],
+  teamCount: number
+): string[][] {
+  if (teamCount <= 0) return [] as string[][]
+
+  const base = Math.floor(words.length / teamCount)
+  const remainder = words.length % teamCount
+  const buckets: string[][] = []
+
+  let cursor = 0
+  for (let index = 0; index < teamCount; index += 1) {
+    const count = base + (index < remainder ? 1 : 0)
+    buckets.push(words.slice(cursor, cursor + count).map((word) => word.id))
+    cursor += count
+  }
+
+  return buckets
+}
+
+/**
+ * Bagi kata rata CAMPUR PER KATEGORI.
+ *
+ * Setiap kategori disebar bergiliran ke semua tim, lalu titik mulai digeser
+ * sepanjang jumlah kata kategori itu — supaya tim yang kebagian "terakhir" di
+ * satu kategori tidak selalu kalah di kategori berikutnya. Hasilnya setiap tim
+ * mendapat campuran kategori yang seimbang, dan tetap tanpa kata kembar.
+ *
+ * Contoh: 6 Hewan + 3 Benda untuk 2 tim => tim 1 dapat 3 Hewan + 2 Benda.
+ */
+export function splitQuestionsByCategory(
+  words: CharadeWord[],
+  teamCount: number
+): string[][] {
+  if (teamCount <= 0) return [] as string[][]
+
+  // Kelompokkan per kategori, urut sesuai kemunculan pertama di editor.
+  const groups = new Map<string, string[]>()
+  for (const word of words) {
+    const key = categoryOf(word)
+    const bucket = groups.get(key)
+    if (bucket) bucket.push(word.id)
+    else groups.set(key, [word.id])
+  }
+
+  const buckets: string[][] = Array.from({ length: teamCount }, () => [] as string[])
+  let offset = 0
+
+  for (const ids of Array.from(groups.values())) {
+    ids.forEach((id, index) => {
+      buckets[(index + offset) % teamCount].push(id)
+    })
+    offset += ids.length
+  }
+
+  return buckets
+}
+
+/** Pilih cara pembagian sesuai pilihan host di lobby. */
+export function buildCharadeBuckets(
+  words: CharadeWord[],
+  teamCount: number,
+  division: CharadeDivision
+): string[][] {
+  return division === 'sequence'
+    ? splitQuestionsSequentially(words, teamCount)
+    : splitQuestionsByCategory(words, teamCount)
+}
+
+/** Komposisi kategori dari satu daftar id, mis. `2 Hewan · 1 Benda`. */
+export function summarizeCategories(words: CharadeWord[], ids: string[]) {
+  const lookup = new Map(words.map((word) => [word.id, categoryOf(word)]))
+  const counts = new Map<string, number>()
+
+  for (const id of ids) {
+    const key = lookup.get(id) ?? DEFAULT_CATEGORY_LABEL
+    counts.set(key, (counts.get(key) ?? 0) + 1)
+  }
+
+  return Array.from(counts.entries()).map(([category, count]) => ({
+    category,
+    count,
+  }))
+}
+
+/**
+ * Ringkasan komposisi kategori tiap tim — dipakai pratinjau di lobby host.
+ * Contoh: `[[{ category: 'Hewan', count: 2 }, { category: 'Benda', count: 1 }]]`
+ */
+export function summarizeTeamCategories(
+  words: CharadeWord[],
+  buckets: string[][]
+) {
+  return buckets.map((ids) => summarizeCategories(words, ids))
+}
+
+/**
+ * Bagikan daftar kata ke tiap tim lalu mulai babak pertama.
  * Dipanggil host dari lobby dengan tombol "Bagi soal & mulai".
  */
 export async function startCharadesGame({
   gameId,
-  totalQuestions,
+  words,
   roundTimeLimit,
+  division,
 }: {
   gameId: string
-  totalQuestions: number
+  words: CharadeWord[]
   roundTimeLimit: number
+  division: CharadeDivision
 }) {
   const teams = await getParticipants(gameId)
 
   if (teams.length === 0) {
     throw new Error('Belum ada tim yang bergabung.')
   }
-  if (totalQuestions < teams.length) {
+  if (words.length < teams.length) {
     throw new Error(
-      `Jumlah soal (${totalQuestions}) lebih sedikit dari jumlah tim (${teams.length}). Tambah soal dulu, atau kurangi tim yang ikut.`
+      `Jumlah kata (${words.length}) lebih sedikit dari jumlah tim (${teams.length}). Tambah kata dulu, atau kurangi tim yang ikut.`
     )
   }
 
-  const slices = splitQuestionsForTeams(totalQuestions, teams.length)
+  const buckets = buildCharadeBuckets(words, teams.length, division)
 
   for (let index = 0; index < teams.length; index += 1) {
     const { error } = await supabase
       .from('participants')
-      .update({
-        team_index: index,
-        question_start: slices[index].start,
-        question_count: slices[index].count,
-      })
+      .update({ team_index: index, question_ids: buckets[index] })
       .eq('id', teams[index].id)
 
     if (error) {

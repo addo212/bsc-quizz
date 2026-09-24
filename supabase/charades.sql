@@ -9,8 +9,11 @@
 --      Penebak tidak melihat layar dan menebak dengan suara.
 --    * Pemegang HP menekan BENAR (+1 poin) atau LEWATI (0 poin).
 --    * Semua tim bermain BERSAMAAN dalam satu babak berdurasi tetap.
---    * Soal DIBAGI RATA tanpa tumpang tindih: setiap tim mendapat potongan
---      soalnya sendiri, jadi tidak ada dua tim yang mendapat kata sama.
+--    * Soal DIBAGI RATA tanpa tumpang tindih: setiap tim mendapat daftar
+--      katanya sendiri, jadi tidak ada dua tim yang mendapat kata sama.
+--    * Setiap kata boleh punya KATEGORI. Di lobby host bisa memilih pembagian
+--      "Campur rata per kategori" supaya tiap tim mendapat campuran seimbang
+--      dari semua kategori (mis. 2 Hewan + 2 Benda + 1 Perbuatan).
 --
 --  Tanpa menjalankan file ini aplikasi tetap jalan seperti biasa (mode klasik),
 --  hanya tombol "Tebak Kata" yang tidak bisa dipakai.
@@ -54,15 +57,25 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- 3. Pembagian soal per tim
---    question_start/question_count = potongan soal milik tim tersebut.
+-- 3. Kategori kata + pembagian soal per tim
+--    question_ids = daftar soal milik tim tersebut, berurutan sesuai giliran.
+--    Daftar ini ditulis host saat menekan "Bagi soal & mulai", dan bisa
+--    "dicampur" antar kategori (lihat pilihan pembagian di lobby).
 --    Posisi kata saat ini TIDAK disimpan di sini, melainkan dihitung dari
 --    jumlah baris `answers` milik tim -> pemain tidak bisa mengubahnya sendiri.
 -- ---------------------------------------------------------------------------
+alter table public.questions
+    add column if not exists category text;
+
 alter table public.participants
-    add column if not exists team_index     smallint,
-    add column if not exists question_start integer,
-    add column if not exists question_count integer;
+    add column if not exists team_index   smallint,
+    add column if not exists question_ids uuid[] not null default '{}';
+
+-- Versi awal memakai rentang soal berurutan. Sekarang digantikan oleh
+-- `question_ids` supaya pembagian antar kategori bisa dicampur.
+alter table public.participants
+    drop column if exists question_start,
+    drop column if exists question_count;
 
 -- ---------------------------------------------------------------------------
 -- 4. RLS: host boleh membagi tim, pemain tetap hanya boleh baca
