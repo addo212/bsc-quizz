@@ -123,14 +123,14 @@ export default function HomePage() {
                   </span>
                 </div>
                 <h3 className="mt-4 rounded-2xl bg-white px-4 py-5 text-center font-display text-lg font-bold text-slate-900">
-                  Ibu kota Australia adalah?
+                  Siapakah member accounting paling ganteng?
                 </h3>
                 <div className="mt-4 grid grid-cols-2 gap-2.5">
                   {[
-                    { label: 'Sydney', bg: 'bg-rose-500' },
-                    { label: 'Canberra', bg: 'bg-sky-500' },
-                    { label: 'Melbourne', bg: 'bg-amber-400' },
-                    { label: 'Perth', bg: 'bg-emerald-500' },
+                    { label: 'Zainul', bg: 'bg-rose-500' },
+                    { label: 'Arifin', bg: 'bg-sky-500' },
+                    { label: 'Ipin', bg: 'bg-amber-400' },
+                    { label: 'Zainul Arifin', bg: 'bg-emerald-500' },
                   ].map((option) => (
                     <div
                       key={option.label}
