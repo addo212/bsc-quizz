@@ -120,7 +120,7 @@ function DashboardContent() {
     setBusyId(quiz.id)
     setError(null)
     try {
-      const game = await createGame(quiz.id)
+      const game = await createGame(quiz.id, quiz.game_mode ?? 'classic')
       router.push(`/host/game/${game.pin}`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Gagal membuka ruangan')
@@ -378,8 +378,9 @@ function QuizCard({
       <div className="flex flex-1 flex-col p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Badge tone={questions > 0 ? 'violet' : 'amber'}>
-            {questions} soal
+            {questions} {quiz.game_mode === 'charades' ? 'kata' : 'soal'}
           </Badge>
+          {quiz.game_mode === 'charades' && <Badge tone="sky">🎭 Tebak Kata</Badge>}
           {quiz.is_public ? (
             <Badge tone="emerald">Publik</Badge>
           ) : (

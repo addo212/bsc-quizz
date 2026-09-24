@@ -47,6 +47,16 @@ export type ProfileStatus = Profile['status']
 export type QuestionType = Database['public']['Tables']['questions']['Row']['question_type']
 
 /**
+ * Cara permainan dijalankan.
+ * - `classic`  : semua pemain menjawab soal yang sama.
+ * - `charades` : tebak kata, tiap tim dapat kata berbeda (lihat `supabase/charades.sql`).
+ */
+export type GameMode = Database['public']['Tables']['games']['Row']['mode']
+
+/** Peserta = satu tim (1 HP per tim) saat mode tebak kata. */
+export type Team = Participant
+
+/**
  * Bentuk soal yang dibaca pemain lewat RPC `get_game_questions`
  * (lihat `supabase/hardening.sql`). Kunci jawaban (`text_answer` dan
  * `is_correct`) bernilai null selama jawaban belum di-reveal.

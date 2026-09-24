@@ -1,4 +1,4 @@
-import { supabase, Choice, Question, QuizSet } from '@/types/types'
+import { supabase, Choice, GameMode, Question, QuizSet } from '@/types/types'
 import { DEFAULT_POINTS, DEFAULT_TIME_LIMIT } from '@/constants'
 
 /**
@@ -50,10 +50,20 @@ export async function listQuizSummaries(): Promise<QuizSet[]> {
   return listQuizSets()
 }
 
-export async function createQuizSet(name = 'Quiz Tanpa Judul') {
+export async function createQuizSet(
+  name = 'Quiz Tanpa Judul',
+  gameMode: GameMode = 'classic'
+) {
   const { data, error } = await supabase
     .from('quiz_sets')
-    .insert({ name, description: '', cover_color: 'violet' })
+    .insert({
+      name,
+      description: '',
+      cover_color: 'violet',
+      // Kolom `game_mode` baru ada setelah supabase/charades.sql dijalankan.
+      // Kuis klasik tidak menulisinya supaya aplikasi tetap jalan tanpa migrasi.
+      ...(gameMode === 'charades' ? { game_mode: gameMode } : {}),
+    })
     .select()
     .single()
 
@@ -68,11 +78,16 @@ export async function updateQuizSet(
     description?: string | null
     cover_color?: string
     is_public?: boolean
+    game_mode?: GameMode
   }
 ) {
+  const payload = { ...patch }
+  // Sama seperti createQuizSet: hanya mode tebak kata yang menyentuh kolom baru.
+  if (payload.game_mode !== 'charades') delete payload.game_mode
+
   const { error } = await supabase
     .from('quiz_sets')
-    .update(patch)
+    .update(payload)
     .eq('id', quizId)
   if (error) throw new Error(explainError(error))
 }
@@ -86,11 +101,12 @@ export async function duplicateQuizSet(quizId: string): Promise<QuizSet> {
   const original = await getQuizSet(quizId)
   if (!original) throw new Error('Quiz tidak ditemukan')
 
-  const copy = await createQuizSet(`${original.name} (salinan)`)
+  const copy = await createQuizSet(`${original.name} (salinan)`, original.game_mode)
   await updateQuizSet(copy.id, {
     description: original.description,
     cover_color: original.cover_color,
     is_public: original.is_public,
+    game_mode: original.game_mode,
   })
 
   await saveQuiz({
@@ -226,5 +242,5 @@ function normalizeQuizSet(row: any): QuizSet {
         ),
     }))
 
-  return { ...(row as QuizSet), questions }
+  return { ...(row as QuizSet), game_mode: row.game_mode ?? 'classic', questions }
 }

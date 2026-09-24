@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Choice, Question, QuizSet } from '@/types/types'
+import { Choice, GameMode, Question, QuizSet } from '@/types/types'
 import { getQuizSet, saveQuiz, updateQuizSet } from '@/lib/quiz'
 import { createGame } from '@/lib/game'
 import { useHostAccess } from '@/lib/use-host-access'
@@ -12,6 +12,7 @@ import {
   ANSWER_STYLES,
   DEFAULT_POINTS,
   DEFAULT_TIME_LIMIT,
+  GAME_MODES,
   MAX_NAME_LENGTH,
   MAX_TEXT_ANSWER_LENGTH,
   MAX_TIME_LIMIT,
@@ -38,6 +39,8 @@ type Draft = {
   description: string
   cover_color: string
   is_public: boolean
+  /** 'charades' = mode tebak kata: kata + gambar, tanpa pilihan jawaban. */
+  game_mode: GameMode
   questions: Question[]
 }
 
@@ -51,7 +54,13 @@ function emptyChoice(): Choice {
   }
 }
 
-function emptyQuestion(order: number): Question {
+/**
+ * Soal kosong baru.
+ *
+ * Di mode tebak kata `body` berisi KATA KUNCI dan soal sengaja tidak punya
+ * pilihan jawaban — pemain hanya menekan Benar / Lewati.
+ */
+function emptyQuestion(order: number, charades = false): Question {
   return {
     id: crypto.randomUUID(),
     created_at: new Date().toISOString(),
@@ -64,7 +73,7 @@ function emptyQuestion(order: number): Question {
     question_type: 'choice',
     text_answer: null,
     text_exact: false,
-    choices: [emptyChoice(), emptyChoice()],
+    choices: charades ? [] : [emptyChoice(), emptyChoice()],
   }
 }
 
@@ -109,8 +118,11 @@ export default function QuizEditorPage({
           description: quiz.description ?? '',
           cover_color: quiz.cover_color ?? 'violet',
           is_public: quiz.is_public,
+          game_mode: quiz.game_mode ?? 'classic',
           questions:
-            quiz.questions.length > 0 ? quiz.questions : [emptyQuestion(0)],
+            quiz.questions.length > 0
+              ? quiz.questions
+              : [emptyQuestion(0, quiz.game_mode === 'charades')],
         })
         setLoading(false)
       } catch (caught) {
@@ -132,10 +144,17 @@ export default function QuizEditorPage({
   /* -------------------------------- Validasi ------------------------------- */
   const problems = useMemo(() => {
     if (!draft) return []
+    const charades = draft.game_mode === 'charades'
     const list: string[] = []
     if (!draft.name.trim()) list.push('Judul kuis masih kosong.')
+    if (draft.questions.length === 0) list.push('Kuis belum punya soal.')
+
     draft.questions.forEach((question, index) => {
-      if (!question.body.trim()) list.push(`Soal ${index + 1} belum diisi.`)
+      const label = charades ? `Kata ${index + 1}` : `Soal ${index + 1}`
+      if (!question.body.trim()) list.push(`${label} belum diisi.`)
+
+      // Mode tebak kata: cukup kata kunci. Pilihan jawaban tidak dipakai.
+      if (charades) return
 
       // Soal jawaban diketik: cukup butuh kunci jawaban.
       if (question.question_type === 'text') {
@@ -167,8 +186,20 @@ export default function QuizEditorPage({
           description: current.description.trim(),
           cover_color: current.cover_color,
           is_public: current.is_public,
+          game_mode: current.game_mode,
         })
-        await saveQuiz({ quizId, questions: current.questions })
+        // Mode tebak kata tidak memakai pilihan jawaban, jadi jangan disimpan
+        // walau di editor masih tersisa dari mode klasik sebelumnya.
+        await saveQuiz({
+          quizId,
+          questions:
+            current.game_mode === 'charades'
+              ? current.questions.map((question) => ({
+                  ...question,
+                  choices: [],
+                }))
+              : current.questions,
+        })
         setDirty(false)
         setSavedAt(Date.now())
         return true
@@ -194,7 +225,7 @@ export default function QuizEditorPage({
       return
     }
     try {
-      const game = await createGame(quizId)
+      const game = await createGame(quizId, draft.game_mode)
       router.push(`/host/game/${game.pin}`)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Gagal membuka ruangan')
@@ -205,11 +236,35 @@ export default function QuizEditorPage({
   /* ------------------------------- Manipulasi ------------------------------ */
   const addQuestion = () => {
     const nextIndex = draftRef.current?.questions.length ?? 0
+    const charades = draftRef.current?.game_mode === 'charades'
     mutate((current) => ({
       ...current,
-      questions: [...current.questions, emptyQuestion(current.questions.length)],
+      questions: [
+        ...current.questions,
+        emptyQuestion(current.questions.length, charades),
+      ],
     }))
     setActiveIndex(nextIndex)
+  }
+
+  /** Ganti mode permainan tanpa menghapus apa pun. */
+  const setGameMode = (mode: GameMode) => {
+    mutate((current) => ({
+      ...current,
+      game_mode: mode,
+      questions:
+        mode === 'charades'
+          ? current.questions.map((question) => ({ ...question, choices: [] }))
+          : current.questions.map((question) =>
+              question.choices.length >= 2
+                ? question
+                : {
+                    ...question,
+                    choices: [emptyChoice(), emptyChoice()],
+                  }
+            ),
+    }))
+    setActiveIndex(0)
   }
 
   const duplicateQuestion = (index: number) => {
@@ -536,6 +591,9 @@ export default function QuizEditorPage({
             <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white backdrop-blur">
               {draft.questions.length} soal
             </span>
+            <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold text-white backdrop-blur">
+              {draft.game_mode === 'charades' ? 'Tebak Kata' : 'Klasik'}
+            </span>
             <button
               type="button"
               onClick={() => setShowSettings((value) => !value)}
@@ -550,7 +608,35 @@ export default function QuizEditorPage({
       {/* Pengaturan */}
       {showSettings && (
         <div className="mt-4 animate-fade-in rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Mode permainan
+            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {GAME_MODES.map((mode) => (
+                <button
+                  key={mode.id}
+                  type="button"
+                  onClick={() => setGameMode(mode.id)}
+                  className={cn(
+                    'rounded-xl border p-3 text-left transition',
+                    draft.game_mode === mode.id
+                      ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-500/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  )}
+                >
+                  <span className="block text-sm font-bold text-slate-800">
+                    {mode.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                    {mode.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-end justify-between gap-4 border-t border-slate-100 pt-5">
             <div>
               <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Warna cover
@@ -638,6 +724,7 @@ export default function QuizEditorPage({
           question={draft.questions[activeIndex]}
           index={activeIndex}
           total={draft.questions.length}
+          charades={draft.game_mode === 'charades'}
           onUpdate={(patch) => updateQuestion(activeIndex, patch)}
           onUpdateChoice={(choiceIndex, patch) =>
             updateChoice(activeIndex, choiceIndex, patch)
@@ -1009,6 +1096,7 @@ function QuestionEditor({
   question,
   index,
   total,
+  charades,
   onUpdate,
   onUpdateChoice,
   onSetCorrect,
@@ -1021,6 +1109,8 @@ function QuestionEditor({
   question: Question
   index: number
   total: number
+  /** true = mode tebak kata: kata kunci + gambar, tanpa pilihan jawaban. */
+  charades: boolean
   onUpdate: (patch: Partial<Question>) => void
   onUpdateChoice: (choiceIndex: number, patch: Partial<Choice>) => void
   onSetCorrect: (choiceIndex: number) => void
@@ -1034,7 +1124,7 @@ function QuestionEditor({
     <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-display text-lg font-extrabold text-slate-900">
-          Soal {index + 1}
+          {charades ? `Kata ${index + 1}` : `Soal ${index + 1}`}
         </h2>
         <div className="flex items-center gap-1">
           <button
@@ -1071,44 +1161,59 @@ function QuestionEditor({
       </div>
 
       <div className="mt-4 space-y-4">
-        <Field label="Pertanyaan">
+        <Field
+          label={charades ? 'Kata kunci' : 'Pertanyaan'}
+          hint={
+            charades
+              ? 'Ditampilkan ke pemeraga. Penebak tidak melihat layar dan menebak dengan suara.'
+              : undefined
+          }
+        >
           <Textarea
             rows={2}
             value={question.body}
             onChange={(event) => onUpdate({ body: event.target.value })}
-            placeholder="Tulis pertanyaannya di sini…"
+            placeholder={
+              charades ? 'Contoh: Termometer' : 'Tulis pertanyaannya di sini…'
+            }
             className="font-medium"
           />
         </Field>
 
-        <Field label="Tipe soal">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {QUESTION_TYPES.map((type) => (
-              <button
-                key={type.id}
-                type="button"
-                onClick={() => onUpdate({ question_type: type.id })}
-                className={cn(
-                  'rounded-xl border p-3 text-left transition',
-                  question.question_type === type.id
-                    ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-500/20'
-                    : 'border-slate-200 bg-white hover:border-slate-300'
-                )}
-              >
-                <span className="block text-sm font-bold text-slate-800">
-                  {type.label}
-                </span>
-                <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
-                  {type.hint}
-                </span>
-              </button>
-            ))}
-          </div>
-        </Field>
+        {!charades && (
+          <Field label="Tipe soal">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {QUESTION_TYPES.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  onClick={() => onUpdate({ question_type: type.id })}
+                  className={cn(
+                    'rounded-xl border p-3 text-left transition',
+                    question.question_type === type.id
+                      ? 'border-violet-500 bg-violet-50 ring-2 ring-violet-500/20'
+                      : 'border-slate-200 bg-white hover:border-slate-300'
+                  )}
+                >
+                  <span className="block text-sm font-bold text-slate-800">
+                    {type.label}
+                  </span>
+                  <span className="mt-0.5 block text-xs leading-relaxed text-slate-500">
+                    {type.hint}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </Field>
+        )}
 
         <Field
-          label="URL gambar (opsional)"
-          hint="Tempel tautan gambar publik (https://…) untuk ditampilkan di atas soal."
+          label={charades ? 'URL gambar petunjuk (opsional)' : 'URL gambar (opsional)'}
+          hint={
+            charades
+              ? 'Gambar pendukung peragaan, misalnya foto benda yang dimaksud.'
+              : 'Tempel tautan gambar publik (https://…) untuk ditampilkan di atas soal.'
+          }
         >
           <Input
             value={question.image_url ?? ''}
@@ -1123,6 +1228,8 @@ function QuestionEditor({
           <QuestionImagePreview url={question.image_url.trim()} />
         ) : null}
 
+        {/* Pengaturan waktu & poin tidak dipakai di mode tebak kata */}
+        {!charades && (
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Waktu menjawab">
             <div className="flex items-center gap-2">
@@ -1186,9 +1293,17 @@ function QuestionEditor({
             </div>
           </Field>
         </div>
+        )}
 
-        {/* Pilihan jawaban / kunci jawaban teks */}
-        {question.question_type === 'text' ? (
+        {/* Pilihan jawaban (klasik) atau keterangan (mode tebak kata) */}
+        {charades ? (
+          <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-relaxed text-violet-700">
+            <strong className="font-bold">Mode Tebak Kata.</strong> Kata kunci di
+            atas hanya menjadi petunjuk peragaan — penebak tidak melihat layar,
+            dan pemegang HP menekan <b>Benar</b> (+1 poin) atau <b>Lewati</b>.
+            Soal ini karena itu tidak butuh pilihan jawaban.
+          </div>
+        ) : question.question_type === 'text' ? (
           <TextAnswerFields question={question} onUpdate={onUpdate} />
         ) : (
         <div>

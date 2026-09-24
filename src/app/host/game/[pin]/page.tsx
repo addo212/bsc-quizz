@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { HostLobby } from './lobby'
 import { HostQuiz } from './quiz'
+import { HostCharades } from './charades'
 import { HostResults } from './results'
 import {
   Answer,
@@ -18,6 +19,7 @@ import {
   applyScores,
   backToLobby,
   finishGame,
+  getAnswersForGame,
   getAnswersForQuestion,
   getGameByPin,
   getGameResults,
@@ -25,6 +27,8 @@ import {
   goToQuestion,
   resetGameAnswers,
   setAnswerRevealed,
+  startCharadesGame,
+  startCharadesRound,
   startQuiz,
 } from '@/lib/game'
 import { getQuizSet } from '@/lib/quiz'
@@ -41,6 +45,8 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
   const [quiz, setQuiz] = useState<QuizSet | null>(null)
   const [players, setPlayers] = useState<Participant[]>([])
   const [answers, setAnswers] = useState<Answer[]>([])
+  /** Mode tebak kata: seluruh jawaban permainan ini, untuk papan skor live. */
+  const [charadeAnswers, setCharadeAnswers] = useState<Answer[]>([])
   const [leaderboard, setLeaderboard] = useState<GameResult[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -192,6 +198,29 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
     }
   }, [gameId])
 
+  /* ------------------- Jawaban semua tim (mode tebak kata) ----------------- */
+  useEffect(() => {
+    if (!gameId || game?.mode !== 'charades') return
+    let alive = true
+
+    const load = async () => {
+      try {
+        const rows = await getAnswersForGame(gameId)
+        if (alive) setCharadeAnswers(rows)
+      } catch {
+        /* abaikan */
+      }
+    }
+
+    load()
+    const interval = window.setInterval(load, 3000)
+
+    return () => {
+      alive = false
+      window.clearInterval(interval)
+    }
+  }, [gameId, game?.mode])
+
   /* ----------------------------- Jawaban live ------------------------------ */
   useEffect(() => {
     // Kosongkan dulu supaya hitungan soal baru tidak memakai data soal lama.
@@ -320,11 +349,37 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
   ])
 
   /* -------------------------------- Aksi ----------------------------------- */
-  const handleStart = async () => {
+  /**
+   * Tombol "Mulai" di lobby.
+   *
+   * Mode klasik: mulai dari soal pertama.
+   * Mode tebak kata: bagi soal rata ke semua tim lalu buka babak pertama.
+   */
+  const handleStart = async (roundTimeLimit: number) => {
     const current = gameRef.current
-    if (!current) return
+    const loadedQuiz = quizRef.current
+    if (!current || !loadedQuiz) return
     setBusy(true)
     try {
+      if (current.mode === 'charades') {
+        await startCharadesGame({
+          gameId: current.id,
+          totalQuestions: loadedQuiz.questions.length,
+          roundTimeLimit,
+        })
+        setGame({
+          ...current,
+          phase: 'quiz',
+          current_round: 1,
+          round_time_limit: roundTimeLimit,
+          round_started_at: new Date().toISOString(),
+          is_answer_revealed: false,
+        })
+        setCharadeAnswers([])
+        setPlayers(await getParticipants(current.id))
+        return
+      }
+
       await startQuiz(current.id)
       setGame({
         ...current,
@@ -335,6 +390,27 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       setLeaderboard(await getGameResults(current.id))
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Gagal memulai')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  /** Buka babak berikutnya di mode tebak kata. */
+  const handleNextCharadeRound = async () => {
+    const current = gameRef.current
+    if (!current) return
+    const round = (current.current_round ?? 1) + 1
+    setBusy(true)
+    try {
+      await startCharadesRound(current.id, round)
+      setGame({
+        ...current,
+        current_round: round,
+        round_started_at: new Date().toISOString(),
+        is_answer_revealed: false,
+      })
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'Gagal membuka babak')
     } finally {
       setBusy(false)
     }
@@ -394,9 +470,12 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
         ...current,
         phase: 'lobby',
         current_question_sequence: 0,
+        current_round: 0,
+        round_started_at: null,
         is_answer_revealed: false,
       })
       setAnswers([])
+      setCharadeAnswers([])
       setLeaderboard([])
       setPlayers(await getParticipants(current.id))
     } catch (caught) {
@@ -451,6 +530,8 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
     )
   }
 
+  const isCharades = game.mode === 'charades'
+
   if (game.phase === 'lobby') {
     return (
       <HostLobby
@@ -459,6 +540,7 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
         totalQuestions={quiz.questions.length}
         players={players}
         starting={busy}
+        charades={isCharades}
         onStart={handleStart}
       />
     )
@@ -472,6 +554,24 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
         replaying={busy}
         onReplay={handleReplay}
         onExit={() => router.push('/')}
+      />
+    )
+  }
+
+  // Mode tebak kata tidak memakai `current_question_sequence`, jadi cek
+  // "soal tidak ditemukan" hanya berlaku untuk mode klasik.
+  if (isCharades) {
+    return (
+      <HostCharades
+        pin={pin}
+        quizName={quiz.name}
+        game={game}
+        players={players}
+        answers={charadeAnswers}
+        busy={busy}
+        onNextRound={handleNextCharadeRound}
+        onFinish={handleFinish}
+        onBackToLobby={handleReplay}
       />
     )
   }

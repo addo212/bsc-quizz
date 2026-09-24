@@ -37,6 +37,40 @@ export const QUESTION_TYPES = [
 /** Batas panjang jawaban yang diketik pemain */
 export const MAX_TEXT_ANSWER_LENGTH = 80
 
+/* -------------------------------------------------------------------------- */
+/*  Mode permainan                                                            */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * `classic`  — semua pemain menjawab soal yang sama, poin pakai bonus kecepatan.
+ * `charades` — tebak kata: 1 HP per tim, tiap tim dapat kata berbeda,
+ *              dinilai Benar (+1) / Lewati (0) oleh pemegang HP.
+ */
+export const GAME_MODES = [
+  {
+    id: 'classic',
+    label: 'Klasik',
+    hint: 'Semua pemain menjawab soal yang sama. Poin + bonus kecepatan.',
+  },
+  {
+    id: 'charades',
+    label: 'Tebak Kata',
+    hint: '1 HP per tim (2 orang). Tiap tim dapat kata berbeda, main serentak per babak.',
+  },
+] as const
+
+export type GameModeId = (typeof GAME_MODES)[number]['id']
+
+/** Poin untuk satu kata yang berhasil ditebak di mode Tebak Kata. */
+export const CHARADE_POINT = 1
+
+/** Pilihan durasi satu babak Tebak Kata (detik) */
+export const ROUND_TIME_OPTIONS = [30, 45, 60, 90, 120, 180]
+
+export const DEFAULT_ROUND_TIME = 60
+export const MIN_ROUND_TIME = 10
+export const MAX_ROUND_TIME = 300
+
 /** Opsi tema warna cover quiz */
 export const COVER_COLORS = [
   { id: 'violet', label: 'Violet', from: '#7c3aed', to: '#c026d3' },

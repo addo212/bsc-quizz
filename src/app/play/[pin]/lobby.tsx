@@ -10,6 +10,7 @@ export function PlayerLobby({
   totalQuestions,
   quizName,
   connecting,
+  charades = false,
 }: {
   participant: Participant
   pin: string
@@ -17,6 +18,8 @@ export function PlayerLobby({
   totalQuestions: number
   quizName?: string
   connecting: boolean
+  /** true = mode tebak kata: satu HP per tim. */
+  charades?: boolean
 }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-950 px-5 py-10">
@@ -27,9 +30,23 @@ export function PlayerLobby({
           Halo, {participant.nickname}!
         </h1>
         <p className="mt-2 text-sm leading-relaxed text-white/60">
-          Kamu sudah masuk ruangan. Lihat layar host — permainan akan segera
-          dimulai.
+          {charades
+            ? 'Tim kamu sudah masuk. Pegang satu HP ini — pemeraga melihat layar, penebak menebak dengan suara.'
+            : 'Kamu sudah masuk ruangan. Lihat layar host — permainan akan segera dimulai.'}
         </p>
+
+        {charades && (
+          <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-3 text-left">
+            <p className="text-xs font-semibold uppercase tracking-wider text-white/40">
+              🎭 Mode Tebak Kata
+            </p>
+            <ul className="mt-2 space-y-1 text-xs leading-relaxed text-white/60">
+              <li>• 1 tim = 1 HP. Nama di atas adalah nama tim kamu.</li>
+              <li>• Tiap tim dapat kata yang berbeda, tidak ada yang sama.</li>
+              <li>• Tekan BENAR (+1) atau LEWATI setiap kali kata selesai.</li>
+            </ul>
+          </div>
+        )}
 
         {quizName && (
           <p className="mt-4 inline-flex rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/70">
@@ -56,7 +73,7 @@ export function PlayerLobby({
           <p className="mt-2 text-xs text-white/50">
             {connecting
               ? 'Menghubungkan…'
-              : `${playerCount} pemain sudah bergabung`}
+              : `${playerCount} ${charades ? 'tim' : 'pemain'} sudah bergabung`}
           </p>
         </div>
 

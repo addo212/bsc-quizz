@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PlayerLobby } from './lobby'
 import { PlayerQuiz } from './quiz'
+import { PlayerCharades } from './charades'
 import { PlayerResults } from './results'
 import {
   Answer,
@@ -20,9 +21,11 @@ import {
   getGameById,
   getMyAnswers,
   getParticipants,
+  markCharadeWord,
   submitAnswer,
 } from '@/lib/game'
 import { useSession } from '@/lib/use-session'
+import { CHARADE_POINT } from '@/constants'
 import { Alert, Button, ButtonLink, FullPageLoader, Logo } from '@/components/ui'
 
 export default function PlayPage({ params }: { params: { pin: string } }) {
@@ -240,6 +243,44 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
     if (game?.phase === 'lobby') setAnswers({})
   }, [game?.phase])
 
+  /**
+   * Mode tebak kata: pembagian soal (`question_start` / `question_count`)
+   * baru ditulis host saat menekan "Bagi soal & mulai", jadi baris peserta
+   * harus dibaca ulang — kalau tidak, tim akan memutar seluruh daftar kata.
+   */
+  useEffect(() => {
+    if (game?.mode !== 'charades' || !game?.id || !participant?.id || !userId) {
+      return
+    }
+
+    const targetGameId = game.id
+    let alive = true
+
+    const load = async () => {
+      try {
+        const fresh = await findMyParticipant(targetGameId, userId)
+        if (!alive || !fresh) return
+        setParticipant((current) =>
+          current &&
+          current.team_index === fresh.team_index &&
+          current.question_start === fresh.question_start &&
+          current.question_count === fresh.question_count
+            ? current
+            : fresh
+        )
+      } catch {
+        /* abaikan, coba lagi di interval berikutnya */
+      }
+    }
+
+    const interval = window.setInterval(load, 4000)
+
+    return () => {
+      alive = false
+      window.clearInterval(interval)
+    }
+  }, [game?.mode, game?.id, participant?.id, userId])
+
   /* ------------------------------ 5. Aksi ---------------------------------- */
   const currentQuestion = game
     ? questions[game.current_question_sequence] ?? null
@@ -346,6 +387,58 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
     void sendAnswer({ freeText: text, answeredAt })
   }
 
+  /**
+   * Mode tebak kata: pemegang HP menandai kata BENAR (+1) atau LEWATI (0).
+   * Kata berikutnya langsung muncul secara optimistis, lalu disimpan di
+   * belakang layar — jadi permainan tidak terasa tersendat.
+   */
+  const handleCharadeMark = async (
+    question: Question,
+    correct: boolean,
+    elapsedMs: number
+  ) => {
+    const me = participantRef.current
+    if (!me || submitting) return
+
+    const timeTakenMs = Math.max(0, Math.round(elapsedMs))
+    setSubmitting(true)
+    setAnswers((prev) => ({
+      ...prev,
+      [question.id]: {
+        id: 'pending',
+        created_at: new Date().toISOString(),
+        participant_id: me.id,
+        question_id: question.id,
+        choice_id: null,
+        free_text: null,
+        score: correct ? CHARADE_POINT : 0,
+        time_taken_ms: timeTakenMs,
+      },
+    }))
+
+    try {
+      await markCharadeWord({
+        participantId: me.id,
+        questionId: question.id,
+        correct,
+        timeTakenMs,
+      })
+    } catch (caught) {
+      setAnswers((prev) => {
+        const next = { ...prev }
+        delete next[question.id]
+        return next
+      })
+      setNotice(
+        caught instanceof Error
+          ? `Gagal menyimpan: ${caught.message}`
+          : 'Gagal menyimpan, coba lagi.'
+      )
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   /* ------------------------------- 6. Render -------------------------------- */
   if (!ready || loading) {
     return (
@@ -399,6 +492,7 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
         playerCount={playerCount}
         totalQuestions={questions.length}
         connecting={!ready}
+        charades={game.mode === 'charades'}
       />
     )
   }
@@ -409,6 +503,20 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
         gameId={game.id}
         participantId={participant.id}
         nickname={participant.nickname}
+      />
+    )
+  }
+
+  if (game.mode === 'charades') {
+    return (
+      <PlayerCharades
+        game={game}
+        participant={participant}
+        questions={questions}
+        answers={answers}
+        totalScore={totalScore}
+        submitting={submitting}
+        onMark={handleCharadeMark}
       />
     )
   }
@@ -455,7 +563,10 @@ function isSameGame(a: Game | null, b: Game) {
     a.id === b.id &&
     a.phase === b.phase &&
     a.current_question_sequence === b.current_question_sequence &&
-    a.is_answer_revealed === b.is_answer_revealed
+    a.is_answer_revealed === b.is_answer_revealed &&
+    // Mode tebak kata memakai babak, bukan nomor soal.
+    a.current_round === b.current_round &&
+    a.round_started_at === b.round_started_at
   )
 }
 

@@ -1,4 +1,5 @@
-import { supabase, Answer, Game, GameQuestion, GameResult, Participant, Question } from '@/types/types'
+import { supabase, Answer, Game, GameMode, GameQuestion, GameResult, Participant, Question } from '@/types/types'
+import { CHARADE_POINT } from '@/constants'
 import { randomPin } from './utils'
 
 /* -------------------------------------------------------------------------- */
@@ -7,15 +8,28 @@ import { randomPin } from './utils'
 
 /**
  * Membuat sesi permainan baru + PIN unik 6 digit.
+ *
+ * `mode` menentukan cara permainan dijalankan. Isinya diambil dari kuis
+ * (`quiz_sets.game_mode`) supaya host tidak perlu memilih dua kali.
+ *
+ * Kolom `mode` hanya ditulis untuk mode tebak kata, jadi permainan klasik
+ * tetap bisa dibuat walaupun `supabase/charades.sql` belum dijalankan.
  */
-export async function createGame(quizSetId: string): Promise<Game> {
+export async function createGame(
+  quizSetId: string,
+  mode: GameMode = 'classic'
+): Promise<Game> {
   let lastError: string | null = null
 
   for (let attempt = 0; attempt < 6; attempt += 1) {
     const pin = randomPin()
     const { data, error } = await supabase
       .from('games')
-      .insert({ quiz_set_id: quizSetId, pin })
+      .insert({
+        quiz_set_id: quizSetId,
+        pin,
+        ...(mode === 'charades' ? { mode } : {}),
+      })
       .select()
       .single()
 
@@ -291,6 +305,28 @@ export async function getMyAnswers(participantId: string): Promise<Answer[]> {
   return data ?? []
 }
 
+/**
+ * Semua jawaban di satu permainan.
+ *
+ * Dipakai layar host mode tebak kata untuk menghitung skor tiap tim secara
+ * langsung. Pemain tidak memakai ini — RLS membatasi mereka ke jawaban sendiri.
+ */
+export async function getAnswersForGame(gameId: string): Promise<Answer[]> {
+  const players = await getParticipants(gameId)
+  if (players.length === 0) return []
+
+  const { data, error } = await supabase
+    .from('answers')
+    .select()
+    .in(
+      'participant_id',
+      players.map((player) => player.id)
+    )
+
+  if (error) throw new Error(error.message)
+  return data ?? []
+}
+
 export async function getGameResults(gameId: string): Promise<GameResult[]> {
   const { data, error } = await supabase
     .from('game_results')
@@ -357,4 +393,129 @@ export async function fetchGameQuestions(
       a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0
     ),
   })) as Question[]
+}
+
+/* -------------------------------------------------------------------------- */
+/*  MODE TEBAK KATA (charades)                                                */
+/*                                                                            */
+/*  Alur: satu tim = satu HP (biasanya 2 orang, 1 memperagakan / 1 menebak).   */
+/*  Semua tim bermain serentak dalam babak berdurasi tetap, dan tiap tim      */
+/*  mendapat POTONGAN SOAL SENDIRI sehingga tidak ada kata yang sama.         */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Bagi soal rata ke sejumlah tim tanpa tumpang tindih.
+ *
+ * Sisa pembagian diberikan ke tim urutan awal, jadi totalnya selalu utuh:
+ * 15 soal / 4 tim => 4, 4, 4, 3.
+ */
+export function splitQuestionsForTeams(totalQuestions: number, teamCount: number) {
+  if (teamCount <= 0) return [] as { start: number; count: number }[]
+
+  const base = Math.floor(totalQuestions / teamCount)
+  const remainder = totalQuestions % teamCount
+  const slices: { start: number; count: number }[] = []
+
+  let offset = 0
+  for (let index = 0; index < teamCount; index += 1) {
+    const count = base + (index < remainder ? 1 : 0)
+    slices.push({ start: offset, count })
+    offset += count
+  }
+
+  return slices
+}
+
+/**
+ * Bagikan potongan soal ke tiap tim lalu mulai babak pertama.
+ * Dipanggil host dari lobby dengan tombol "Bagi soal & mulai".
+ */
+export async function startCharadesGame({
+  gameId,
+  totalQuestions,
+  roundTimeLimit,
+}: {
+  gameId: string
+  totalQuestions: number
+  roundTimeLimit: number
+}) {
+  const teams = await getParticipants(gameId)
+
+  if (teams.length === 0) {
+    throw new Error('Belum ada tim yang bergabung.')
+  }
+  if (totalQuestions < teams.length) {
+    throw new Error(
+      `Jumlah soal (${totalQuestions}) lebih sedikit dari jumlah tim (${teams.length}). Tambah soal dulu, atau kurangi tim yang ikut.`
+    )
+  }
+
+  const slices = splitQuestionsForTeams(totalQuestions, teams.length)
+
+  for (let index = 0; index < teams.length; index += 1) {
+    const { error } = await supabase
+      .from('participants')
+      .update({
+        team_index: index,
+        question_start: slices[index].start,
+        question_count: slices[index].count,
+      })
+      .eq('id', teams[index].id)
+
+    if (error) {
+      throw new Error(
+        `${error.message}. Pastikan supabase/charades.sql sudah dijalankan di Supabase.`
+      )
+    }
+  }
+
+  await updateGame(gameId, {
+    mode: 'charades',
+    phase: 'quiz',
+    current_round: 1,
+    round_time_limit: roundTimeLimit,
+    round_started_at: new Date().toISOString(),
+    is_answer_revealed: false,
+  })
+}
+
+/** Mulai babak berikutnya. Tim melanjutkan kata berikutnya di potongannya. */
+export function startCharadesRound(gameId: string, round: number) {
+  return updateGame(gameId, {
+    phase: 'quiz',
+    current_round: round,
+    round_started_at: new Date().toISOString(),
+    is_answer_revealed: false,
+  })
+}
+
+/**
+ * Pemegang HP menandai satu kata: BENAR (+1) atau LEWATI (0).
+ *
+ * Berbeda dari mode klasik, di sini pemain yang menulis skor karena dialah
+ * jurinya — pemeraga/pemegang HP sudah tahu jawabannya sendiri. Skor tetap
+ * terlihat langsung oleh host di layar kontrol.
+ */
+export async function markCharadeWord({
+  participantId,
+  questionId,
+  correct,
+  timeTakenMs,
+}: {
+  participantId: string
+  questionId: string
+  correct: boolean
+  timeTakenMs: number
+}) {
+  const { error } = await supabase.from('answers').insert({
+    participant_id: participantId,
+    question_id: questionId,
+    choice_id: null,
+    free_text: null,
+    score: correct ? CHARADE_POINT : 0,
+    time_taken_ms: Math.max(0, Math.round(timeTakenMs)),
+  })
+
+  // 23505 = kata ini sudah dinilai (tap ganda / sinyal lambat) -> abaikan saja.
+  if (error && error.code !== '23505') throw new Error(error.message)
 }

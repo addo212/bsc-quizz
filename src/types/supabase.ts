@@ -17,6 +17,14 @@ export type Json =
 
 export type GamePhase = 'lobby' | 'quiz' | 'result'
 
+/**
+ * Cara permainan dijalankan.
+ * - `classic`  : semua pemain menjawab soal yang sama, poin berdasarkan kecepatan.
+ * - `charades` : tebak kata / peragaan. Satu HP per tim, soal dibagi rata dan
+ *                tiap tim mendapat kata yang berbeda, dinilai Benar/Lewati.
+ */
+export type GameMode = 'classic' | 'charades'
+
 export type QuestionType = 'choice' | 'text'
 
 /** Status persetujuan akun host. */
@@ -73,6 +81,7 @@ export interface Database {
           user_id: string | null
           cover_color: string
           is_public: boolean
+          game_mode: GameMode
         }
         Insert: {
           id?: string
@@ -82,6 +91,7 @@ export interface Database {
           user_id?: string | null
           cover_color?: string
           is_public?: boolean
+          game_mode?: GameMode
         }
         Update: {
           id?: string
@@ -91,6 +101,7 @@ export interface Database {
           user_id?: string | null
           cover_color?: string
           is_public?: boolean
+          game_mode?: GameMode
         }
         Relationships: []
       }
@@ -170,6 +181,10 @@ export interface Database {
           quiz_set_id: string
           host_user_id: string | null
           pin: string | null
+          mode: GameMode
+          round_time_limit: number
+          current_round: number
+          round_started_at: string | null
         }
         Insert: {
           id?: string
@@ -180,6 +195,10 @@ export interface Database {
           quiz_set_id: string
           host_user_id?: string | null
           pin?: string | null
+          mode?: GameMode
+          round_time_limit?: number
+          current_round?: number
+          round_started_at?: string | null
         }
         Update: {
           id?: string
@@ -190,6 +209,10 @@ export interface Database {
           quiz_set_id?: string
           host_user_id?: string | null
           pin?: string | null
+          mode?: GameMode
+          round_time_limit?: number
+          current_round?: number
+          round_started_at?: string | null
         }
         Relationships: []
       }
@@ -200,6 +223,9 @@ export interface Database {
           nickname: string
           game_id: string
           user_id: string
+          team_index: number | null
+          question_start: number | null
+          question_count: number | null
         }
         Insert: {
           id?: string
@@ -207,6 +233,9 @@ export interface Database {
           nickname: string
           game_id: string
           user_id?: string
+          team_index?: number | null
+          question_start?: number | null
+          question_count?: number | null
         }
         Update: {
           id?: string
@@ -214,6 +243,9 @@ export interface Database {
           nickname?: string
           game_id?: string
           user_id?: string
+          team_index?: number | null
+          question_start?: number | null
+          question_count?: number | null
         }
         Relationships: []
       }
