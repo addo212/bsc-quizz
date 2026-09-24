@@ -97,15 +97,28 @@ export async function resetGameAnswers(gameId: string) {
   const players = await getParticipants(gameId)
   if (players.length === 0) return
 
+  const participantIds = players.map((player) => player.id)
+
   const { error } = await supabase
     .from('answers')
     .delete()
-    .in(
-      'participant_id',
-      players.map((player) => player.id)
-    )
+    .in('participant_id', participantIds)
 
   if (error) throw new Error(error.message)
+
+  // Penting: kalau kebijakan RLS untuk host belum terpasang, PostgREST
+  // melaporkan sukses padahal tidak menghapus apa pun. Cek sisa datanya
+  // supaya pemain tidak "terkunci" karena jawaban lamanya masih ada.
+  const { data: remaining } = await supabase
+    .from('answers')
+    .select('id')
+    .in('participant_id', participantIds)
+
+  if (remaining && remaining.length > 0) {
+    throw new Error(
+      `Gagal membersihkan ${remaining.length} jawaban lama. Jalankan ulang supabase/setup.sql di Supabase agar kebijakan "Host can reset answers" terpasang.`
+    )
+  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -228,13 +241,25 @@ export async function applyScores(
   }
 }
 
+/**
+ * Jawaban untuk satu soal, **dibatasi hanya pemain di permainan ini**.
+ *
+ * Penting: satu soal dimiliki oleh *kuis*, dan kuis yang sama bisa dimainkan
+ * berkali-kali (PIN berbeda). Kalau kueri hanya menyaring `question_id`,
+ * jawaban dari permainan sebelumnya akan ikut terbaca — jumlah jawaban jadi
+ * salah dan pemain lama ikut mendapat skor.
+ */
 export async function getAnswersForQuestion(
-  questionId: string
+  questionId: string,
+  participantIds: string[]
 ): Promise<Answer[]> {
+  if (participantIds.length === 0) return []
+
   const { data, error } = await supabase
     .from('answers')
     .select()
     .eq('question_id', questionId)
+    .in('participant_id', participantIds)
 
   if (error) throw new Error(error.message)
   return data ?? []

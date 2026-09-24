@@ -231,6 +231,15 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
     }
   }, [participant?.id])
 
+  /**
+   * Saat host mengembalikan permainan ke lobby (tombol "Main lagi"), buang
+   * jawaban lama dari state. Kalau tidak, soal pertama di putaran berikutnya
+   * dianggap sudah dijawab sehingga pemain tidak bisa menjawab lagi.
+   */
+  useEffect(() => {
+    if (game?.phase === 'lobby') setAnswers({})
+  }, [game?.phase])
+
   /* ------------------------------ 5. Aksi ---------------------------------- */
   const currentQuestion = game
     ? questions[game.current_question_sequence] ?? null

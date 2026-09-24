@@ -48,12 +48,14 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
 
   const gameRef = useRef<Game | null>(null)
   const quizRef = useRef<QuizSet | null>(null)
+  const playersRef = useRef<Participant[]>([])
   const revealedRef = useRef(false)
   /** Soal mana yang datanya sedang ada di `answers`. */
   const answersQuestionRef = useRef<string | null>(null)
 
   gameRef.current = game
   quizRef.current = quiz
+  playersRef.current = players
 
   const gameId = game?.id
   const sequence = game?.current_question_sequence ?? 0
@@ -201,7 +203,12 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
 
     const load = async () => {
       try {
-        const rows = await getAnswersForQuestion(currentQuestionId)
+        // Hanya jawaban pemain di ruangan ini — soal yang sama bisa dipakai
+        // berkali-kali di permainan berbeda.
+        const rows = await getAnswersForQuestion(
+          currentQuestionId,
+          playersRef.current.map((player) => player.id)
+        )
         if (!alive) return
         answersQuestionRef.current = currentQuestionId
         setAnswers(rows)
@@ -225,6 +232,12 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
         (payload) => {
           if (!alive) return
           const incoming = payload.new as Answer
+          // Realtime hanya bisa difilter per soal, jadi saring manual: abaikan
+          // jawaban milik pemain dari permainan lain yang memakai kuis sama.
+          const belongsHere = playersRef.current.some(
+            (player) => player.id === incoming.participant_id
+          )
+          if (!belongsHere) return
           setAnswers((current) =>
             current.some((answer) => answer.id === incoming.id)
               ? current
@@ -257,7 +270,10 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       setGame({ ...current, is_answer_revealed: true })
       await setAnswerRevealed(current.id, true)
 
-      const rows = await getAnswersForQuestion(question.id)
+      const rows = await getAnswersForQuestion(
+        question.id,
+        playersRef.current.map((player) => player.id)
+      )
       setAnswers(rows)
 
       if (rows.length > 0) {
