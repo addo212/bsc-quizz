@@ -5,8 +5,16 @@ import { usePathname } from 'next/navigation'
 import { AccountMenu } from '@/components/AccountMenu'
 import { ButtonLink, Logo } from '@/components/ui'
 import { cn } from '@/lib/utils'
+import { useHostAccess } from '@/lib/use-host-access'
 
-const NAV = [
+type NavItem = {
+  label: string
+  href: string
+  icon: React.ReactNode
+  adminOnly?: boolean
+}
+
+const NAV: NavItem[] = [
   {
     label: 'Kuis Saya',
     href: '/host/dashboard',
@@ -25,6 +33,16 @@ const NAV = [
       </svg>
     ),
   },
+  {
+    label: 'Persetujuan Akun',
+    href: '/host/admin',
+    adminOnly: true,
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" strokeWidth={1.7} stroke="currentColor" className="h-5 w-5">
+        <path strokeLinecap="round" strokeLinejoin="round" d="M18 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM3 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 9.374 21c-2.331 0-4.512-.645-6.374-1.766Z" />
+      </svg>
+    ),
+  },
 ]
 
 export default function DashboardLayout({
@@ -33,6 +51,9 @@ export default function DashboardLayout({
   children: React.ReactNode
 }) {
   const pathname = usePathname()
+  const { isAdmin, canManageQuizzes } = useHostAccess()
+
+  const navItems = NAV.filter((item) => !item.adminOnly || isAdmin)
 
   const isActive = (href: string) =>
     href === '/host/dashboard'
@@ -51,14 +72,16 @@ export default function DashboardLayout({
             <ButtonLink href="/" variant="ghost" size="sm">
               Beranda
             </ButtonLink>
-            <ButtonLink href="/host/dashboard?new=1" size="sm">
-              + Kuis
-            </ButtonLink>
+            {canManageQuizzes && (
+              <ButtonLink href="/host/dashboard?new=1" size="sm">
+                + Kuis
+              </ButtonLink>
+            )}
             <AccountMenu compact />
           </div>
         </div>
         <nav className="flex gap-1 overflow-x-auto px-4 pb-2">
-          {NAV.map((item) => (
+          {navItems.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -82,12 +105,23 @@ export default function DashboardLayout({
             <Logo />
           </Link>
 
-          <ButtonLink href="/host/dashboard?new=1" block size="md">
-            + Buat kuis baru
-          </ButtonLink>
+          {canManageQuizzes ? (
+            <ButtonLink href="/host/dashboard?new=1" block size="md">
+              + Buat kuis baru
+            </ButtonLink>
+          ) : (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-800">
+                Hanya bisa memainkan
+              </p>
+              <p className="mt-0.5 text-xs leading-relaxed text-amber-700">
+                Pembuatan kuis perlu akun yang disetujui admin.
+              </p>
+            </div>
+          )}
 
           <nav className="mt-6 flex-1 space-y-1">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}

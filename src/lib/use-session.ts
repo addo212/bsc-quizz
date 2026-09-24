@@ -131,6 +131,27 @@ export async function signOut() {
   if (error) throw new Error(error.message)
 }
 
+/**
+ * Masuk dengan Google.
+ *
+ * Akun Google baru juga melewati persetujuan admin — profilnya dibuat
+ * berstatus `pending` oleh trigger di database, persis seperti pendaftar email.
+ */
+export async function signInWithGoogle(redirectPath = '/host/dashboard') {
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: `${window.location.origin}${redirectPath}`,
+    },
+  })
+
+  if (error) {
+    throw new Error(
+      `${error.message} — pastikan provider Google sudah diaktifkan di Supabase (Authentication → Providers).`
+    )
+  }
+}
+
 /** Buat nickname acak yang lucu untuk pemain yang malas mengetik. */
 export function randomNicknames() {
   const adjectives = [

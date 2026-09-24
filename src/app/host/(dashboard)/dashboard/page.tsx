@@ -9,7 +9,7 @@ import {
   listQuizSets,
 } from '@/lib/quiz'
 import { createGame } from '@/lib/game'
-import { useSession } from '@/lib/use-session'
+import { useHostAccess } from '@/lib/use-host-access'
 import { QuizSet } from '@/types/types'
 import { coverGradient } from '@/constants'
 import { cn } from '@/lib/utils'
@@ -40,7 +40,15 @@ export default function DashboardPage() {
 function DashboardContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { ready, userId, isAnonymous } = useSession()
+  const {
+    ready,
+    userId,
+    isAnonymous,
+    statusLabel,
+    profile,
+    canManageQuizzes,
+    isAdmin,
+  } = useHostAccess()
 
   const [quizzes, setQuizzes] = useState<QuizSet[]>([])
   const [loading, setLoading] = useState(true)
@@ -73,6 +81,12 @@ function DashboardContent() {
 
   const handleCreate = useCallback(async () => {
     if (!userId || creating) return
+    if (!canManageQuizzes) {
+      setError(
+        'Akun Anda belum disetujui admin, jadi belum bisa membuat kuis baru.'
+      )
+      return
+    }
     setCreating(true)
     try {
       const created = await createQuizSet('Kuis Baru')
@@ -81,16 +95,16 @@ function DashboardContent() {
       setError(caught instanceof Error ? caught.message : 'Gagal membuat kuis')
       setCreating(false)
     }
-  }, [userId, creating, router])
+  }, [userId, creating, router, canManageQuizzes])
 
   // Dukungan tautan "+ Buat kuis baru" dari navigasi: /host/dashboard?new=1
   useEffect(() => {
-    if (!ready || !userId) return
+    if (!ready || !userId || !canManageQuizzes) return
     if (searchParams.get('new') === '1') {
       router.replace('/host/dashboard')
       void handleCreate()
     }
-  }, [ready, userId, searchParams, router, handleCreate])
+  }, [ready, userId, searchParams, router, handleCreate, canManageQuizzes])
 
   const myQuizzes = useMemo(
     () => quizzes.filter((quiz) => quiz.user_id && quiz.user_id === userId),
@@ -161,22 +175,60 @@ function DashboardContent() {
               : `${visible.length} kuis · ${totalQuestions} soal total`}
           </p>
         </div>
-        <Button
-          onClick={handleCreate}
-          loading={creating}
-          size="lg"
-          className="sm:w-auto"
-          block
-        >
-          + Buat kuis baru
-        </Button>
+        {canManageQuizzes ? (
+          <Button
+            onClick={handleCreate}
+            loading={creating}
+            size="lg"
+            className="sm:w-auto"
+            block
+          >
+            + Buat kuis baru
+          </Button>
+        ) : (
+          <Badge tone="amber" className="!px-3 !py-2 !text-sm">
+            {statusLabel}
+          </Badge>
+        )}
       </div>
 
-      {isAnonymous && userId && !loading && (
-        <Alert tone="info" className="mt-5">
-          Anda masuk sebagai <strong>tamu</strong>. Kuis tetap bisa dibuat dan
-          dimainkan, tetapi hanya tersimpan di browser ini. Login lewat menu akun
-          (kiri bawah di desktop) agar bisa dibuka dari perangkat lain.
+      {!canManageQuizzes && !isAdmin && !loading && (
+        <Alert
+          tone={profile?.status === 'rejected' ? 'error' : 'warning'}
+          className="mt-5"
+        >
+          {profile?.status === 'rejected' ? (
+            <>
+              Pendaftaran Anda <strong>ditolak</strong> admin. Hubungi admin
+              kalau menurut Anda ini keliru.
+            </>
+          ) : isAnonymous ? (
+            <>
+              Anda masuk sebagai <strong>tamu</strong>. Kuis yang sudah ada tetap
+              bisa dibuka dan dimainkan, tetapi untuk{' '}
+              <strong>membuat kuis baru</strong> Anda perlu masuk dengan akun yang
+              disetujui admin — klik menu akun di sidebar.
+            </>
+          ) : (
+            <>
+              Akun Anda <strong>menunggu persetujuan admin</strong>. Sementara ini
+              kuis yang sudah ada tetap bisa dibuka dan dimainkan, tetapi Anda
+              belum bisa membuat kuis baru.
+            </>
+          )}
+        </Alert>
+      )}
+
+      {canManageQuizzes && isAdmin && (
+        <Alert tone="success" className="mt-5">
+          Anda masuk sebagai <strong>admin</strong>. Ada pendaftar baru?{' '}
+          <a
+            href="/host/admin"
+            className="font-semibold underline underline-offset-2"
+          >
+            Buka halaman Admin
+          </a>
+          .
         </Alert>
       )}
 
@@ -232,11 +284,17 @@ function DashboardContent() {
                 ? 'Belum ada kuis di sini'
                 : 'Belum ada kuis publik'
             }
-            description="Mulai dari kuis kosong, isi soal dan jawaban benarnya, lalu bagikan PIN ke pemain."
+            description={
+              canManageQuizzes
+                ? 'Mulai dari kuis kosong, isi soal dan jawaban benarnya, lalu bagikan PIN ke pemain.'
+                : 'Belum ada kuis publik yang bisa dimainkan. Minta admin menyetujui akun Anda agar bisa membuat kuis sendiri.'
+            }
             action={
-              <Button onClick={handleCreate} loading={creating} size="lg">
-                + Buat kuis pertama
-              </Button>
+              canManageQuizzes ? (
+                <Button onClick={handleCreate} loading={creating} size="lg">
+                  + Buat kuis pertama
+                </Button>
+              ) : undefined
             }
           />
         ) : (
@@ -246,6 +304,7 @@ function DashboardContent() {
                 key={quiz.id}
                 quiz={quiz}
                 mine={quiz.user_id === userId}
+                canManage={canManageQuizzes}
                 busy={busyId === quiz.id}
                 onHost={() => handleHost(quiz)}
                 onDuplicate={() => handleDuplicate(quiz)}
@@ -279,6 +338,7 @@ function DashboardContent() {
 function QuizCard({
   quiz,
   mine,
+  canManage,
   busy,
   onHost,
   onDuplicate,
@@ -286,6 +346,7 @@ function QuizCard({
 }: {
   quiz: QuizSet
   mine: boolean
+  canManage: boolean
   busy: boolean
   onHost: () => void
   onDuplicate: () => void
@@ -347,7 +408,7 @@ function QuizCard({
             >
               ▶ Mainkan
             </Button>
-            {mine && (
+            {mine && canManage && (
               <>
                 <ButtonLink
                   href={`/host/quiz/${quiz.id}`}

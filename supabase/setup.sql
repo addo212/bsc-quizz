@@ -196,6 +196,139 @@ left join public.answers a on a.participant_id = p.id
 group by g.id, p.id, p.nickname;
 
 -- ---------------------------------------------------------------------------
+-- 3b. PROFIL HOST & PERSETUJUAN AKUN
+--
+--     - Pemain memakai sesi ANONIM (tanpa email) -> tidak dibuatkan profil,
+--       jadi tidak pernah terblokir.
+--     - Host dengan akun (email/password ATAU Google) baru bisa membuat &
+--       mengubah kuis setelah statusnya 'approved'.
+--     - Tamu & akun yang belum disetujui tetap bisa membuka ruangan dari
+--       kuis yang sudah ada.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.profiles (
+    id          uuid primary key references auth.users (id) on delete cascade,
+    email       text,
+    full_name   text,
+    avatar_url  text,
+    provider    text    default 'email',
+    status      text    default 'pending' not null,
+    is_admin    boolean default false   not null,
+    created_at  timestamptz default now() not null,
+    reviewed_at timestamptz,
+    reviewed_by uuid references auth.users (id) on delete set null
+);
+
+alter table public.profiles
+    add column if not exists avatar_url text,
+    add column if not exists provider   text default 'email';
+
+do $$
+begin
+    if not exists (
+        select 1 from pg_constraint where conname = 'profiles_status_check'
+    ) then
+        alter table public.profiles
+            add constraint profiles_status_check
+            check (status in ('pending', 'approved', 'rejected'));
+    end if;
+end $$;
+
+-- Profil dibuat otomatis untuk SETIAP user baru yang punya email — termasuk
+-- pendaftar lewat Google. Pendaftar pertama disetujui & jadi admin supaya
+-- Anda tidak terkunci di luar; sisanya menunggu persetujuan.
+create or replace function public.handle_new_user()
+returns trigger language plpgsql security definer
+set search_path = public, pg_temp as $$
+declare
+    v_first boolean;
+begin
+    if new.email is null then
+        return new;
+    end if;
+
+    select not exists (select 1 from public.profiles) into v_first;
+
+    insert into public.profiles
+        (id, email, full_name, avatar_url, provider, status, is_admin)
+    values (
+        new.id,
+        new.email,
+        coalesce(
+            new.raw_user_meta_data ->> 'full_name',
+            new.raw_user_meta_data ->> 'name'
+        ),
+        nullif(new.raw_user_meta_data ->> 'avatar_url', ''),
+        coalesce(new.raw_app_meta_data ->> 'provider', 'email'),
+        case when v_first then 'approved' else 'pending' end,
+        v_first
+    )
+    on conflict (id) do nothing;
+
+    return new;
+end $$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+    after insert on auth.users
+    for each row execute function public.handle_new_user();
+
+-- Sekali saja saat pertama memasang skrip ini: akun email yang SUDAH ada
+-- dianggap sudah disetujui, dan yang paling awal menjadi admin.
+do $$
+begin
+    if not exists (select 1 from public.profiles) then
+        insert into public.profiles (id, email, status, is_admin)
+        select
+            u.id,
+            u.email,
+            'approved',
+            row_number() over (order by u.created_at) = 1
+        from auth.users u
+        where u.email is not null;
+    end if;
+end $$;
+
+-- Fungsi bantu untuk kebijakan RLS.
+-- SECURITY DEFINER penting: kebijakan pada tabel profiles sendiri memanggil
+-- fungsi ini, dan tanpa definer akan terjadi rekursi tak berujung.
+create or replace function public.is_approved(uid uuid default auth.uid())
+returns boolean language sql stable security definer
+set search_path = public, pg_temp as $$
+    select exists (
+        select 1 from public.profiles where id = uid and status = 'approved'
+    )
+$$;
+
+create or replace function public.is_admin(uid uuid default auth.uid())
+returns boolean language sql stable security definer
+set search_path = public, pg_temp as $$
+    select exists (
+        select 1 from public.profiles where id = uid and is_admin
+    )
+$$;
+
+grant execute on function public.is_approved(uuid) to anon, authenticated;
+grant execute on function public.is_admin(uuid) to anon, authenticated;
+
+-- RLS tabel profiles ---------------------------------------------------------
+alter table public.profiles enable row level security;
+
+drop policy if exists "Users read own profile" on public.profiles;
+create policy "Users read own profile"
+    on public.profiles for select to authenticated
+    using (id = auth.uid() or public.is_admin());
+
+drop policy if exists "Admins can review profiles" on public.profiles;
+create policy "Admins can review profiles"
+    on public.profiles for update to authenticated
+    using (public.is_admin()) with check (public.is_admin());
+
+-- Sengaja TIDAK ada policy insert/update untuk user biasa, sehingga pendaftar
+-- tidak bisa menaikkan statusnya sendiri atau mengangkat dirinya jadi admin.
+-- Baris profil dibuat oleh trigger (SECURITY DEFINER) yang melewati RLS.
+
+-- ---------------------------------------------------------------------------
 -- 4. ROW LEVEL SECURITY
 --    Catatan: kebijakan di bawah ini dibuat permisif agar aplikasi langsung
 --    jalan (host bisa membaca semua jawaban saat reveal, dsb).
@@ -215,17 +348,21 @@ create policy "Quiz sets are viewable by everyone"
     on public.quiz_sets for select using (true);
 
 drop policy if exists "Authenticated users can create quiz sets" on public.quiz_sets;
-create policy "Authenticated users can create quiz sets"
-    on public.quiz_sets for insert to authenticated with check (true);
+drop policy if exists "Approved hosts can create quiz sets" on public.quiz_sets;
+create policy "Approved hosts can create quiz sets"
+    on public.quiz_sets for insert to authenticated
+    with check (public.is_approved() and auth.uid() = user_id);
 
 drop policy if exists "Owners can update their quiz sets" on public.quiz_sets;
 create policy "Owners can update their quiz sets"
     on public.quiz_sets for update to authenticated
-    using (auth.uid() = user_id) with check (auth.uid() = user_id);
+    using (auth.uid() = user_id and public.is_approved())
+    with check (auth.uid() = user_id and public.is_approved());
 
 drop policy if exists "Owners can delete their quiz sets" on public.quiz_sets;
 create policy "Owners can delete their quiz sets"
-    on public.quiz_sets for delete to authenticated using (auth.uid() = user_id);
+    on public.quiz_sets for delete to authenticated
+    using (auth.uid() = user_id and public.is_approved());
 
 -- questions ------------------------------------------------------------------
 drop policy if exists "Questions are viewable by everyone" on public.questions;
@@ -235,11 +372,11 @@ create policy "Questions are viewable by everyone"
 drop policy if exists "Owners can manage questions" on public.questions;
 create policy "Owners can manage questions"
     on public.questions for all to authenticated
-    using (exists (
+    using (public.is_approved() and exists (
         select 1 from public.quiz_sets qs
         where qs.id = questions.quiz_set_id and qs.user_id = auth.uid()
     ))
-    with check (exists (
+    with check (public.is_approved() and exists (
         select 1 from public.quiz_sets qs
         where qs.id = questions.quiz_set_id and qs.user_id = auth.uid()
     ));
@@ -252,12 +389,12 @@ create policy "Choices are viewable by everyone"
 drop policy if exists "Owners can manage choices" on public.choices;
 create policy "Owners can manage choices"
     on public.choices for all to authenticated
-    using (exists (
+    using (public.is_approved() and exists (
         select 1 from public.questions q
         join public.quiz_sets qs on qs.id = q.quiz_set_id
         where q.id = choices.question_id and qs.user_id = auth.uid()
     ))
-    with check (exists (
+    with check (public.is_approved() and exists (
         select 1 from public.questions q
         join public.quiz_sets qs on qs.id = q.quiz_set_id
         where q.id = choices.question_id and qs.user_id = auth.uid()

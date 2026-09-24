@@ -2,6 +2,22 @@ import { supabase, Choice, Question, QuizSet } from '@/types/types'
 import { DEFAULT_POINTS, DEFAULT_TIME_LIMIT } from '@/constants'
 
 /**
+ * Ubah error "row-level security" menjadi pesan yang bisa dimengerti.
+ * Ini terjadi kalau akun belum disetujui admin (lihat supabase/setup.sql).
+ */
+function explainError(error: { message: string; code?: string }) {
+  const message = error.message ?? ''
+  if (
+    error.code === '42501' ||
+    message.includes('row-level security') ||
+    message.includes('permission denied')
+  ) {
+    return 'Akses ditolak: akun Anda belum disetujui admin, jadi belum bisa membuat atau mengubah kuis.'
+  }
+  return message
+}
+
+/**
  * Mengambil semua quiz beserta soal & pilihannya.
  * Dipakai host untuk memuat quiz yang akan dimainkan.
  */
@@ -41,7 +57,7 @@ export async function createQuizSet(name = 'Quiz Tanpa Judul') {
     .select()
     .single()
 
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(explainError(error))
   return data
 }
 
@@ -58,12 +74,12 @@ export async function updateQuizSet(
     .from('quiz_sets')
     .update(patch)
     .eq('id', quizId)
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(explainError(error))
 }
 
 export async function deleteQuizSet(quizId: string) {
   const { error } = await supabase.from('quiz_sets').delete().eq('id', quizId)
-  if (error) throw new Error(error.message)
+  if (error) throw new Error(explainError(error))
 }
 
 export async function duplicateQuizSet(quizId: string): Promise<QuizSet> {
@@ -140,14 +156,14 @@ export async function saveQuiz({
     const { error } = await supabase
       .from('questions')
       .upsert(payloadQuestions, { onConflict: 'id' })
-    if (error) throw new Error(`Gagal menyimpan soal: ${error.message}`)
+    if (error) throw new Error(`Gagal menyimpan soal: ${explainError(error)}`)
   }
 
   if (payloadChoices.length > 0) {
     const { error } = await supabase
       .from('choices')
       .upsert(payloadChoices, { onConflict: 'id' })
-    if (error) throw new Error(`Gagal menyimpan pilihan: ${error.message}`)
+    if (error) throw new Error(`Gagal menyimpan pilihan: ${explainError(error)}`)
   }
 
   // Hapus soal yang sudah dibuang di editor.

@@ -294,6 +294,46 @@ sampai jawaban di-reveal.
 > [`supabase/setup.sql`](supabase/setup.sql) — skripnya idempoten, jadi aman
 > dijalankan berulang kali.
 
+## Persetujuan akun host
+
+Pemain tidak perlu akun sama sekali. Yang dibatasi adalah **pengelolaan kuis**:
+
+| Peran | Buka ruangan dari kuis yang ada | Buat/ubah/hapus kuis | Setujui pendaftar |
+| --- | :--: | :--: | :--: |
+| Pemain / host tamu (tanpa akun) | ✅ | ❌ | ❌ |
+| Akun email atau Google yang baru | ✅ | ❌ (menunggu) | ❌ |
+| Akun yang disetujui | ✅ | ✅ | ❌ |
+| Admin | ✅ | ✅ | ✅ |
+
+Alurnya:
+
+1. Calon host mendaftar lewat email/password, **atau** login pertama kali dengan Google.
+2. Profilnya dibuat otomatis berstatus `pending` oleh trigger `handle_new_user`.
+3. Admin membuka **/host/admin** lalu menekan **Setujui** (atau Tolak).
+4. Setelah disetujui, host bisa membuat dan mengubah kuis.
+
+Pendaftar **pertama** otomatis disetujui dan menjadi admin, supaya Anda tidak
+terkunci di luar. Jadi daftarkan akun Anda lebih dulu sebelum mengumumkan ke
+orang lain.
+
+Ingin menyetujui langsung dari Supabase? Ubah saja kolom statusnya:
+
+```sql
+update public.profiles set status = 'approved'
+where email = 'nama@email.com';
+```
+
+Ingin menjadikan seseorang admin:
+
+```sql
+update public.profiles set is_admin = true, status = 'approved'
+where email = 'nama@email.com';
+```
+
+> Aturan ini ditegakkan di **database** lewat RLS (`public.is_approved()`),
+> bukan hanya disembunyikan di tampilan. Jadi tetap aman walau seseorang
+> memanggil API-nya langsung.
+
 ## Aturan penilaian
 
 ```

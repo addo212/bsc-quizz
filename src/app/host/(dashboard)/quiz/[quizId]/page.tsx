@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { Choice, Question, QuizSet } from '@/types/types'
 import { getQuizSet, saveQuiz, updateQuizSet } from '@/lib/quiz'
 import { createGame } from '@/lib/game'
-import { useSession } from '@/lib/use-session'
+import { useHostAccess } from '@/lib/use-host-access'
 import {
   COVER_COLORS,
   DEFAULT_POINTS,
@@ -74,7 +74,7 @@ export default function QuizEditorPage({
 }) {
   const quizId = params.quizId
   const router = useRouter()
-  const { ready } = useSession()
+  const { ready, canManageQuizzes, isAnonymous, profile } = useHostAccess()
 
   const [draft, setDraft] = useState<Draft | null>(null)
   const [loading, setLoading] = useState(true)
@@ -405,6 +405,28 @@ export default function QuizEditorPage({
   }
 
   /* --------------------------------- Render -------------------------------- */
+  if (ready && !canManageQuizzes) {
+    return (
+      <div className="mx-auto max-w-lg py-16 text-center">
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-6">
+          <h1 className="font-display text-lg font-extrabold text-amber-900">
+            Belum bisa mengedit kuis
+          </h1>
+          <p className="mt-2 text-sm leading-relaxed text-amber-800">
+            {isAnonymous
+              ? 'Anda masuk sebagai tamu. Untuk membuat atau mengubah kuis, masuk dengan akun dan tunggu persetujuan admin.'
+              : profile?.status === 'rejected'
+                ? 'Pendaftaran akun Anda ditolak admin, jadi tidak bisa mengubah kuis.'
+                : 'Akun Anda masih menunggu persetujuan admin. Anda tetap bisa membuka ruangan dari kuis yang sudah ada.'}
+          </p>
+        </div>
+        <ButtonLink href="/host/dashboard" size="lg" className="mt-5">
+          Kembali ke Kuis Saya
+        </ButtonLink>
+      </div>
+    )
+  }
+
   if (loading || !ready) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">

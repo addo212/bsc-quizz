@@ -19,9 +19,51 @@ export type GamePhase = 'lobby' | 'quiz' | 'result'
 
 export type QuestionType = 'choice' | 'text'
 
+/** Status persetujuan akun host. */
+export type ProfileStatus = 'pending' | 'approved' | 'rejected'
+
 export interface Database {
   public: {
     Tables: {
+      profiles: {
+        Row: {
+          id: string
+          email: string | null
+          full_name: string | null
+          avatar_url: string | null
+          provider: string | null
+          status: ProfileStatus
+          is_admin: boolean
+          created_at: string
+          reviewed_at: string | null
+          reviewed_by: string | null
+        }
+        Insert: {
+          id: string
+          email?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          provider?: string | null
+          status?: ProfileStatus
+          is_admin?: boolean
+          created_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Update: {
+          id?: string
+          email?: string | null
+          full_name?: string | null
+          avatar_url?: string | null
+          provider?: string | null
+          status?: ProfileStatus
+          is_admin?: boolean
+          created_at?: string
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+        }
+        Relationships: []
+      }
       quiz_sets: {
         Row: {
           id: string

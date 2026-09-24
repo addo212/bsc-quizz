@@ -39,6 +39,11 @@ export type Game = Database['public']['Tables']['games']['Row']
 
 export type GameResult = Database['public']['Views']['game_results']['Row']
 
+/** Profil host: menyimpan status persetujuan akun. */
+export type Profile = Database['public']['Tables']['profiles']['Row']
+
+export type ProfileStatus = Profile['status']
+
 export type QuestionType = Database['public']['Tables']['questions']['Row']['question_type']
 
 /**
