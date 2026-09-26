@@ -21,7 +21,7 @@ export type GamePhase = 'lobby' | 'quiz' | 'result'
  * Cara permainan dijalankan.
  * - `classic`  : semua pemain menjawab soal yang sama, poin berdasarkan kecepatan.
  * - `charades` : tebak kata / peragaan. Satu HP per tim, soal dibagi rata dan
- *                tiap tim mendapat kata yang berbeda, dinilai Benar/Lewati.
+ *                tiap tim mendapat kata yang berbeda, dinilai Benar/Salah.
  */
 export type GameMode = 'classic' | 'charades'
 

@@ -15,10 +15,13 @@ export function PlayerResults({
   gameId,
   participantId,
   nickname,
+  charades = false,
 }: {
   gameId: string
   participantId: string
   nickname: string
+  /** true = mode tebak kata: pemain adalah satu tim, satuan hitungnya "kata". */
+  charades?: boolean
 }) {
   const { width, height } = useWindowSize()
   const [results, setResults] = useState<GameResult[] | null>(null)
@@ -70,13 +73,14 @@ export function PlayerResults({
               </h1>
               {me && (
                 <p className="mt-2 font-display text-xl font-extrabold text-violet-300">
-                  {formatNumber(me.total_score ?? 0)} poin
+                  {formatNumber(me.total_score ?? 0)}{' '}
+                  {charades ? 'kata benar' : 'poin'}
                 </p>
               )}
               {me && (
                 <p className="mt-1 text-sm text-white/60">
-                  {me.correct_count ?? 0} jawaban benar dari {me.answered_count ?? 0}{' '}
-                  soal dijawab
+                  Benar {me.correct_count ?? 0} dari {me.answered_count ?? 0}{' '}
+                  {charades ? 'kata yang dimainkan' : 'soal yang dijawab'}
                 </p>
               )}
             </div>

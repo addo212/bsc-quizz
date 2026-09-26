@@ -59,7 +59,7 @@ function emptyChoice(): Choice {
  * Soal kosong baru.
  *
  * Di mode tebak kata `body` berisi KATA KUNCI dan soal sengaja tidak punya
- * pilihan jawaban — pemain hanya menekan Benar / Lewati.
+ * pilihan jawaban — pemain hanya menekan Benar / Salah.
  */
 function emptyQuestion(order: number, charades = false): Question {
   return {
@@ -1361,7 +1361,8 @@ function QuestionEditor({
           <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 text-xs leading-relaxed text-violet-700">
             <strong className="font-bold">Mode Tebak Kata.</strong> Kata kunci di
             atas hanya menjadi petunjuk peragaan — penebak tidak melihat layar,
-            dan pemegang HP menekan <b>Benar</b> (+1 poin) atau <b>Lewati</b>.
+            dan pemegang HP menekan <b>Benar</b> (+1 poin) atau <b>Salah</b> (0
+            poin).
             Soal ini karena itu tidak butuh pilihan jawaban.
           </div>
         ) : question.question_type === 'text' ? (

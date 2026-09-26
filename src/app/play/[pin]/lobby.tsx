@@ -43,7 +43,7 @@ export function PlayerLobby({
             <ul className="mt-2 space-y-1 text-xs leading-relaxed text-white/60">
               <li>• 1 tim = 1 HP. Nama di atas adalah nama tim kamu.</li>
               <li>• Tiap tim dapat kata yang berbeda, tidak ada yang sama.</li>
-              <li>• Tekan BENAR (+1) atau LEWATI setiap kali kata selesai.</li>
+              <li>• Tekan BENAR (+1 poin) atau SALAH (0 poin) tiap kata selesai.</li>
             </ul>
           </div>
         )}

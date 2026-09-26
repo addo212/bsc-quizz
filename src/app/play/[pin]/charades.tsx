@@ -201,7 +201,7 @@ export function PlayerCharades({
       <div className="safe-bottom px-4 pb-5">
         {waiting ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/45">
-            Tombol Benar/Lewati muncul begitu kata dibagikan.
+            Tombol SALAH dan BENAR muncul begitu kata dibagikan.
           </div>
         ) : finished ? (
           <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center text-sm text-white/50">
@@ -212,6 +212,20 @@ export function PlayerCharades({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3">
+            {/* SALAH di kiri sengaja: tombol ini mengurangi peluang poin, jadi
+                jangan sampai tertekan tanpa sengaja oleh ibu jari kanan. */}
+            <Button
+              size="xl"
+              variant="danger"
+              className="h-20 text-lg"
+              disabled={locked}
+              onClick={() =>
+                current &&
+                onMark(current, false, Date.now() - shownAtRef.current)
+              }
+            >
+              ✗ SALAH
+            </Button>
             <Button
               size="xl"
               variant="success"
@@ -224,23 +238,13 @@ export function PlayerCharades({
             >
               ✓ BENAR
             </Button>
-            <Button
-              size="xl"
-              variant="secondary"
-              className="h-20 text-lg"
-              disabled={locked}
-              onClick={() =>
-                current &&
-                onMark(current, false, Date.now() - shownAtRef.current)
-              }
-            >
-              Lewati →
-            </Button>
           </div>
         )}
-        <p className="mt-3 text-center text-xs text-white/35">
-          Tekan BENAR kalau penebak menyebut katanya dengan tepat. Lewati untuk
-          pindah ke kata berikutnya tanpa poin.
+        <p className="mt-3 text-center text-xs leading-relaxed text-white/35">
+          Tekan <b className="text-emerald-300">BENAR</b> kalau penebak menyebut
+          kedua katanya dengan tepat (+{CHARADE_POINT} poin). Tekan{' '}
+          <b className="text-rose-300">SALAH</b> kalau keliru atau ingin lanjut
+          ke kata berikutnya (0 poin).
         </p>
       </div>
 

@@ -579,7 +579,7 @@ export function startCharadesRound(gameId: string, round: number) {
 }
 
 /**
- * Pemegang HP menandai satu kata: BENAR (+1) atau LEWATI (0).
+ * Pemegang HP menandai satu kata: BENAR (+1) atau SALAH (0).
  *
  * Berbeda dari mode klasik, di sini pemain yang menulis skor karena dialah
  * jurinya — pemeraga/pemegang HP sudah tahu jawabannya sendiri. Skor tetap

@@ -7,7 +7,7 @@
 --    * Satu tim = satu HP (nama tim dipakai sebagai nickname pemain).
 --    * Layar HP menampilkan KATA KUNCI + GAMBAR kepada PEMERAGA.
 --      Penebak tidak melihat layar dan menebak dengan suara.
---    * Pemegang HP menekan BENAR (+1 poin) atau LEWATI (0 poin).
+--    * Pemegang HP menekan BENAR (+1 poin) atau SALAH (0 poin).
 --    * Semua tim bermain BERSAMAAN dalam satu babak berdurasi tetap.
 --    * Soal DIBAGI RATA tanpa tumpang tindih: setiap tim mendapat daftar
 --      katanya sendiri, jadi tidak ada dua tim yang mendapat kata sama.

@@ -391,7 +391,7 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
   }
 
   /**
-   * Mode tebak kata: pemegang HP menandai kata BENAR (+1) atau LEWATI (0).
+   * Mode tebak kata: pemegang HP menandai kata BENAR (+1) atau SALAH (0).
    * Kata berikutnya langsung muncul secara optimistis, lalu disimpan di
    * belakang layar — jadi permainan tidak terasa tersendat.
    */
@@ -506,6 +506,7 @@ export default function PlayPage({ params }: { params: { pin: string } }) {
         gameId={game.id}
         participantId={participant.id}
         nickname={participant.nickname}
+        charades={game.mode === 'charades'}
       />
     )
   }

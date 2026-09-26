@@ -559,6 +559,7 @@ export default function HostGamePage({ params }: { params: { pin: string } }) {
       <HostResults
         gameId={game.id}
         quizName={quiz.name}
+        charades={isCharades}
         replaying={busy}
         onReplay={handleReplay}
         onExit={() => router.push('/')}

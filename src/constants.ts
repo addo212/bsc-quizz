@@ -44,7 +44,7 @@ export const MAX_TEXT_ANSWER_LENGTH = 80
 /**
  * `classic`  — semua pemain menjawab soal yang sama, poin pakai bonus kecepatan.
  * `charades` — tebak kata: 1 HP per tim, tiap tim dapat kata berbeda,
- *              dinilai Benar (+1) / Lewati (0) oleh pemegang HP.
+ *              dinilai Benar (+1) / Salah (0) oleh pemegang HP.
  */
 export const GAME_MODES = [
   {

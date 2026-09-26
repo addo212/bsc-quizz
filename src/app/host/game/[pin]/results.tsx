@@ -17,12 +17,15 @@ export function HostResults({
   onReplay,
   onExit,
   replaying,
+  charades = false,
 }: {
   gameId: string
   quizName: string
   onReplay: () => void
   onExit: () => void
   replaying: boolean
+  /** true = mode tebak kata: satu peserta = satu tim. */
+  charades?: boolean
 }) {
   const { width, height } = useWindowSize()
   const [results, setResults] = useState<GameResult[] | null>(null)
@@ -75,7 +78,11 @@ export function HostResults({
           <div className="mt-10">
             <EmptyState
               title="Belum ada hasil"
-              description="Tidak ada pemain yang menjawab di permainan ini."
+              description={
+                charades
+                  ? 'Tidak ada tim yang menandai kata di permainan ini.'
+                  : 'Tidak ada pemain yang menjawab di permainan ini.'
+              }
             />
           </div>
         ) : (
@@ -123,7 +130,9 @@ export function HostResults({
                   <thead className="bg-white/5 text-[11px] uppercase tracking-wider text-white/40">
                     <tr>
                       <th className="px-4 py-3 font-semibold">#</th>
-                      <th className="px-4 py-3 font-semibold">Pemain</th>
+                      <th className="px-4 py-3 font-semibold">
+                        {charades ? 'Tim' : 'Pemain'}
+                      </th>
                       <th className="px-4 py-3 text-right font-semibold">Benar</th>
                       <th className="px-4 py-3 text-right font-semibold">Poin</th>
                     </tr>

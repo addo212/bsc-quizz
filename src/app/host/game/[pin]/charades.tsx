@@ -264,7 +264,13 @@ export function HostCharades({
                         </p>
                       </div>
                       <p className="text-xs font-semibold text-white/50">
-                        {entry.played} / {entry.total} dimainkan
+                        {entry.played} / {entry.total} kata dimainkan
+                        {entry.played - entry.correct > 0 && (
+                          <span className="text-rose-300/80">
+                            {' '}
+                            · {entry.played - entry.correct} salah
+                          </span>
+                        )}
                       </p>
                     </div>
 
@@ -289,7 +295,7 @@ export function HostCharades({
 
         <p className="mt-6 text-center text-xs text-white/30">
           Layar ini untuk host. Pemain hanya melihat kata &amp; tombol
-          Benar/Lewati di HP masing-masing.
+          SALAH dan BENAR di HP masing-masing.
         </p>
       </div>
     </div>
